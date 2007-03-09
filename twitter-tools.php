@@ -22,8 +22,8 @@ Author URI: http://alexking.org
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 // **********************************************************************
 
-ini_set('display_errors', '1');
-ini_set('error_reporting', E_ALL);
+/* ini_set('display_errors', '1'); */
+/* ini_set('error_reporting', E_ALL); */
 
 load_plugin_textdomain('twitter-tools');
 
@@ -61,6 +61,8 @@ class twitter_tools {
 		$this->blog_post_category = '1';
 		$this->notify_twitter = '0';
 		$this->update_hash = '';
+		$this->tweet_prefix = 'New blog post';
+		$this->tweet_format = $this->tweet_prefix.': %s %s';
 	}
 
 	function install() {
@@ -78,7 +80,7 @@ class twitter_tools {
 		foreach ($this->options as $option) {
 			add_option('aktt_'.$option, $this->$option);
 		}
-		wp_schedule_event(strtotime('+1 hour'), 'hourly', 'akat_update_tweets');
+		wp_schedule_event(strtotime('+1 hour'), 'hourly', 'aktt_update_tweets');
 	}
 
 	function get_settings() {
@@ -133,6 +135,29 @@ class twitter_tools {
 		}
 		return false;
 	}
+	
+	function do_tweet($tweet = '') {
+		if (empty($this->twitter_username) || empty($this->twitter_password) || empty($tweet) || empty($tweet->tw_text)) {
+			return;
+		}
+		require_once(ABSPATH.WPINC.'/class-snoopy.php');
+		$snoop = new Snoopy;
+		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
+		$snoop->user = $this->twitter_username;
+		$snoop->pass = $this->twitter_password;
+		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
+	}
+	
+	function do_blog_post_tweet($post_id = 0) {
+		if ($this->notify_twitter == '0' || $post_id == 0 || get_post_meta($post_id, 'aktt_tweeted') == '1') {
+			return;
+		}
+		$post = get_post($post_id);
+		$tweet = new aktt_tweet;
+		$tweet->tw_text = sprintf(__($this->tweet_format, 'twitter-tools'), $post->post_title, get_permalink($post_id));
+		$this->do_tweet($tweet);
+		add_post_meta($post_id, 'aktt_tweeted', '1', true);
+	}
 }
 
 class aktt_tweet {
@@ -143,13 +168,42 @@ class aktt_tweet {
 	) {
 		$this->id = '';
 		$this->modified = '';
-		$this->tw_created_at = date('Y-m-d H:i:s', strtotime($tw_created_at));
+		$this->tw_created_at = $tw_created_at;
 		$this->tw_text = $tw_text;
 		$this->tw_id = $tw_id;
 	}
 	
-	function add() {
+	function twdate_to_time($date) {
+		$parts = explode(' ', $date);
+		$date = strtotime($parts[1].' '.$parts[2].', '.$parts[5].' '.$parts[3]);
+		$date = $date + (intval(get_option('gmt_offset')) * 3600);
+		return $date;
+	}
+	
+	function tweet_post_exists() {
 		global $wpdb;
+		$test = $wpdb->get_results("
+			SELECT *
+			FROM $wpdb->postmeta
+			WHERE meta_key = 'aktt_twitter_id'
+			AND meta_value = '$this->tw_id'
+		");
+		if (count($test) > 0) {
+			return true;
+		}
+		return false;
+	}
+	
+	function tweet_is_post_notification() {
+		global $aktt;
+		if (substr($this->tw_text, 0, strlen($aktt->tweet_prefix)) == $aktt->tweet_prefix) {
+			return true;
+		}
+		return false;
+	}
+	
+	function add() {
+		global $wpdb, $aktt;
 		$wpdb->query("
 			INSERT
 			INTO $wpdb->aktt
@@ -161,17 +215,23 @@ class aktt_tweet {
 			VALUES
 			( '".mysql_real_escape_string($this->tw_id)."'
 			, '".mysql_real_escape_string($this->tw_text)."'
-			, '".mysql_real_escape_string($this->tw_created_at)."'
+			, '".date('Y-m-d H:i:s', $this->tw_created_at)."'
 			, NOW()
 			)
 		");
 		do_action('aktt_new_tweet', $this);
-		if ($this->create_blog_posts == '1') {
+		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification()) {
 			$data = array(
 				'post_content' => $this->tw_text
-				, 'post_title' => trip_add_elipsis($this->tw_text, 30)
+				, 'post_title' => trim_add_elipsis($this->tw_text, 30)
+				, 'post_date' => date('Y-m-d H:i:s', $this->tw_created_at)
+				, 'post_category' => array($aktt->blog_post_category)
+				, 'post_status' => 'publish'
 			);
-//			wp_insert_post($data);
+			remove_action('publish_post', 'aktt_notify_twitter');
+			$post_id = wp_insert_post($data);
+			add_post_meta($post_id, 'aktt_twitter_id', $this->tw_id, true);
+			add_action('publish_post', 'aktt_notify_twitter');
 		}
 	}
 }
@@ -200,22 +260,28 @@ function aktt_update_tweets() {
 			IN ('".implode("', '", $tweet_ids)."')
 		");
 		$new_tweets = array();
-		foreach ($tweets as $tweet) {
-			if (!in_array($tweet->id, $existing_ids)) {
-				$new_tweets[] = new aktt_tweet(
-					$tweet->id
-					, $tweet->text
-					, $tweet->created_at
+		foreach ($tweets as $tw_data) {
+			if (!in_array($tw_data->id, $existing_ids)) {
+				$tweet = new aktt_tweet(
+					$tw_data->id
+					, $tw_data->text
 				);
+				$tweet->tw_created_at = $tweet->twdate_to_time($tw_data->created_at);
+				$new_tweets[] = $tweet;
 			}
 		}
 		foreach ($new_tweets as $tweet) {
 			$tweet->add();
-			print('added '.$tweet->tw_id);
 		}
 	}
 	update_option('aktt_update_hash', $hash);
 }
+
+function aktt_notify_twitter($post_id) {
+	global $aktt;
+	$aktt->do_blog_post_tweet($post_id);
+}
+add_action('publish_post', 'aktt_notify_twitter');
 
 function aktt_init() {
 	if (!function_exists('wp_schedule_event')) {
@@ -246,7 +312,13 @@ function aktt_request_handler() {
 			case 'aktt_update_tweets':
 				aktt_update_tweets();
 				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&updated=true');
+				die();
 				break;
+case 'temp_post_tweet':
+	$tweet = new aktt_tweet();
+	$tweet->tw_text = 'Another API test post.';
+	$aktt->post_tweet($tweet);
+	die('posted');
 		}
 	}
 	if (!empty($_POST['ak_action'])) {
@@ -256,6 +328,14 @@ function aktt_request_handler() {
 				$aktt->update_settings();
 				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&updated=true');
 				die();
+				break;
+			case 'aktt_post_tweet_admin':
+				if (!empty($_POST['aktt_tw_text'])) {
+					$tweet = new aktt_tweet();
+					$tweet->tw_text = $_POST['aktt_tw_text'];
+					$aktt->post_tweet($tweet);
+					die('posted');
+				}
 				break;
 		}
 	}
@@ -335,11 +415,11 @@ function aktt_options_form() {
 							<span>'.__('This is only needed if you want to post a new Tweet when you add a blog post, or post to Twitter from within your WP admin panel.', 'twitter-tools').'</span>
 						</p>
 						<p>
-							<label for="aktt_notify_twitter">THIS DOES NOT WORK YET'.__('Create a tweet when you post in your blog?:', 'twitter-tools').'</label>
+							<label for="aktt_notify_twitter">'.__('Create a tweet when you post in your blog?:', 'twitter-tools').'</label>
 							<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
 						</p>
 						<p>
-							<label for="aktt_create_blog_posts">THIS DOES NOT WORK YET'.__('Create a blog post from each of your tweets?:', 'twitter-tools').'</label>
+							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?:', 'twitter-tools').'</label>
 							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$blog_post_options.'</select>
 						</p>
 						<p>
