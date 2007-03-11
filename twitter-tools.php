@@ -2,7 +2,7 @@
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
-Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog.
+Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
 Version: 1.0dev
 Author: Alex King
 Author URI: http://alexking.org
@@ -22,8 +22,8 @@ Author URI: http://alexking.org
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 // **********************************************************************
 
-/* ini_set('display_errors', '1'); */
-/* ini_set('error_reporting', E_ALL); */
+// ini_set('display_errors', '1');
+// ini_set('error_reporting', E_ALL);
 
 load_plugin_textdomain('twitter-tools');
 
@@ -51,7 +51,9 @@ class twitter_tools {
 			, 'create_digest'
 			, 'blog_post_category'
 			, 'notify_twitter'
-			, 'update_hash'
+			, 'sidebar_tweet_count'
+			, 'tweet_from_sidebar'
+			, 'give_tt_credit'
 		);
 		$this->twitter_username = '';
 		$this->twitter_password = '';
@@ -60,9 +62,14 @@ class twitter_tools {
 		$this->create_digest = '0';
 		$this->blog_post_category = '1';
 		$this->notify_twitter = '0';
+		$this->sidebar_tweet_count = '3';
+		$this->tweet_from_sidebar = '1';
+		$this->give_tt_credit = '1';
+		// not included in options
 		$this->update_hash = '';
 		$this->tweet_prefix = 'New blog post';
 		$this->tweet_format = $this->tweet_prefix.': %s %s';
+		$this->last_digest_post = '';
 	}
 
 	function install() {
@@ -80,6 +87,7 @@ class twitter_tools {
 		foreach ($this->options as $option) {
 			add_option('aktt_'.$option, $this->$option);
 		}
+		add_option('aktt_update_hash', '');
 		wp_schedule_event(strtotime('+1 hour'), 'hourly', 'aktt_update_tweets');
 	}
 
@@ -90,8 +98,17 @@ class twitter_tools {
 	}
 
 	function update_settings() {
-		foreach ($this->options as $option) {
-			update_option('aktt_'.$option, $this->$option);
+		if (current_user_can('manage_options')) {
+			if (get_option('aktt_create_digest') != '1' && $this->create_digest == 1) {
+				$this->initiate_digests();
+			}
+			$this->sidebar_tweet_count = intval($this->sidebar_tweet_count);
+			if ($this->sidebar_tweet_count == 0) {
+				$this->sidebar_tweet_count = '3';
+			}
+			foreach ($this->options as $option) {
+				update_option('aktt_'.$option, $this->$option);
+			}
 		}
 	}
 
@@ -104,6 +121,18 @@ class twitter_tools {
 		if (empty($this->twitter_id) && !empty($this->twitter_username)) {
 			$this->get_twitter_id();
 		}
+	}
+	
+	function initiate_digests() {
+		$this->last_digest_post = date('Y-m-d H:i:s');
+		if (get_option('aktt_last_digest_post') == '') {
+			add_option('aktt_last_digest_post', $this->last_digest_post);
+		}
+		else {
+			update_option('aktt_last_digest_post', $this->last_digest_post);
+		}
+// TODO
+//		wp_schedule_event(strtotime('+1 hour'), 'daily', 'aktt_create_digest');
 	}
 
 	function get_twitter_id() {
@@ -137,7 +166,11 @@ class twitter_tools {
 	}
 	
 	function do_tweet($tweet = '') {
-		if (empty($this->twitter_username) || empty($this->twitter_password) || empty($tweet) || empty($tweet->tw_text)) {
+		if (empty($this->twitter_username) 
+			|| empty($this->twitter_password) 
+			|| empty($tweet)
+			|| empty($tweet->tw_text)
+		) {
 			return;
 		}
 		require_once(ABSPATH.WPINC.'/class-snoopy.php');
@@ -149,7 +182,10 @@ class twitter_tools {
 	}
 	
 	function do_blog_post_tweet($post_id = 0) {
-		if ($this->notify_twitter == '0' || $post_id == 0 || get_post_meta($post_id, 'aktt_tweeted') == '1') {
+		if ($this->notify_twitter == '0'
+			|| $post_id == 0
+			|| get_post_meta($post_id, 'aktt_tweeted') == '1'
+		) {
 			return;
 		}
 		$post = get_post($post_id);
@@ -157,6 +193,49 @@ class twitter_tools {
 		$tweet->tw_text = sprintf(__($this->tweet_format, 'twitter-tools'), $post->post_title, get_permalink($post_id));
 		$this->do_tweet($tweet);
 		add_post_meta($post_id, 'aktt_tweeted', '1', true);
+	}
+	
+	function do_tweet_post($tweet) {
+		$data = array(
+			'post_content' => $tweet->tw_text
+			, 'post_title' => trim_add_elipsis($tweet->tw_text, 30)
+			, 'post_date' => date('Y-m-d H:i:s', $tweet->tw_created_at)
+			, 'post_category' => array($aktt->blog_post_category)
+			, 'post_status' => 'publish'
+		);
+		remove_action('publish_post', 'aktt_notify_twitter');
+		$post_id = wp_insert_post($data);
+		add_post_meta($post_id, 'aktt_twitter_id', $tweet->tw_id, true);
+		add_action('publish_post', 'aktt_notify_twitter');
+	}
+	
+	function do_digest_post() {
+		global $wpdb;
+		
+// TODO
+		// need some date mojo here
+		$last_post = $this->last_digest_post;
+		if ($last_post == '') {
+			return;
+		}
+		$tweets = $wpdb->get_results("
+			SELECT *
+			FROM $wpdb->aktt
+			WHERE tw_created_at > '".mysql_real_escape_string($last_post)."'
+			ORDER BY tw_created_at
+		");
+		if (count($tweets) > 0) {
+			$content = '<ul class="aktt_tweets">'."\n";
+			foreach ($tweets as $tweet) {
+				$content .= '	<li>'.$tweet->tw_text.' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+			}
+			$content .= '</ul>'."\n";
+			if ($this->give_tt_credit == '1') {
+				$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+			}
+		}
+		$this->last_digest_post = date('Y-m-d H:i:s');
+		update_option('aktt_last_digest_post', $this->last_digest_post);
 	}
 }
 
@@ -221,17 +300,7 @@ class aktt_tweet {
 		");
 		do_action('aktt_new_tweet', $this);
 		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification()) {
-			$data = array(
-				'post_content' => $this->tw_text
-				, 'post_title' => trim_add_elipsis($this->tw_text, 30)
-				, 'post_date' => date('Y-m-d H:i:s', $this->tw_created_at)
-				, 'post_category' => array($aktt->blog_post_category)
-				, 'post_status' => 'publish'
-			);
-			remove_action('publish_post', 'aktt_notify_twitter');
-			$post_id = wp_insert_post($data);
-			add_post_meta($post_id, 'aktt_twitter_id', $this->tw_id, true);
-			add_action('publish_post', 'aktt_notify_twitter');
+			$aktt->do_tweet_post($this);
 		}
 	}
 }
@@ -283,6 +352,103 @@ function aktt_notify_twitter($post_id) {
 }
 add_action('publish_post', 'aktt_notify_twitter');
 
+function aktt_create_digest() {
+	global $aktt;
+	$aktt->do_digest_post();
+}
+
+function aktt_sidebar_tweets() {
+	global $wpdb, $aktt;
+	$tweets = $wpdb->get_results("
+		SELECT *
+		FROM $wpdb->aktt
+		ORDER BY tw_created_at DESC
+		LIMIT $aktt->sidebar_tweet_count
+	");
+	if (count($tweets) > 0) {
+		$output = '<div class="aktt_tweets">'."\n"
+			.'	<h2>'.__("What I'm Doing", 'twitter-tools').'</h2>'."\n"
+			.'	<ul>'."\n";
+		foreach ($tweets as $tweet) {
+			$output .= '		<li>'.htmlspecialchars($tweet->tw_text).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+		}
+		$output .= '		<li><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n"
+			.'</ul>';
+	}
+	if ($aktt->tweet_from_sidebar == '1') {
+		$output .= aktt_tweet_form('input', 'onsubmit="akttPostTweet(); return false;"');
+		$output .= '	<p id="aktt_tweet_posted_msg">'.__('Posting tweet...', 'twitter-tools').'</p>';
+	}
+	if ($aktt->give_tt_credit == '1') {
+		$output .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+	}
+	print($output);
+}
+
+function aktt_tweet_form($type = 'input', $extra = '') {
+	$output = '';
+	if (current_user_can('publish_posts')) {
+		$output .= '
+<form action="'.get_bloginfo('wpurl').'/index.php" id="aktt_tweet_form" '.$extra.'>
+	<fieldset>
+		';
+		switch ($type) {
+			case 'input':
+				$output .= '
+		<p><input type="text" size="20" maxlength="140" id="aktt_tweet_text" name="aktt_tweet_text" onkeyup="akttCharCount();" /></p>
+		<input type="hidden" name="ak_action" value="post_tweet_sidebar" />
+		<script type="text/javascript">
+		//<![CDATA[
+		function akttCharCount() {
+			var count = document.getElementById("aktt_tweet_text").value.length;
+			if (count > 0) {
+				document.getElementById("aktt_char_count").innerHTML = 140 - count;
+			}
+			else {
+				document.getElementById("aktt_char_count").innerHTML = "";
+			}
+		}
+		setTimeout("akttCharCount();", 500);
+		document.getElementById("aktt_tweet_form").setAttribute("autocomplete", "off");
+		//]]>
+		</script>
+				';
+				break;
+			case 'textarea':
+				$output .= '
+		<p><textarea type="text" cols="60" rows="5" maxlength="140" id="aktt_tweet_text" name="aktt_tweet_text" onkeyup="akttCharCount();"></textarea></p>
+		<input type="hidden" name="ak_action" value="post_tweet_admin" />
+		<script type="text/javascript">
+		//<![CDATA[
+		function akttCharCount() {
+			var count = document.getElementById("aktt_tweet_text").value.length;
+			if (count > 0) {
+				document.getElementById("aktt_char_count").innerHTML = (140 - count) + "'.__(' characters remaining', 'twitter-tools').'";
+			}
+			else {
+				document.getElementById("aktt_char_count").innerHTML = "";
+			}
+		}
+		setTimeout("akttCharCount();", 500);
+		document.getElementById("aktt_tweet_form").setAttribute("autocomplete", "off");
+		//]]>
+		</script>
+				';
+				break;
+		}
+		$output .= '
+		<p>
+			<input type="submit" id="aktt_tweet_submit" name="aktt_tweet_submit" value="'.__('Post Tweet!', 'twitter-tools').'" />
+			<span id="aktt_char_count"></span>
+		</p>
+		<div class="clear"></div>
+	</fieldset>
+</form>
+		';
+	}
+	return $output;
+}
+
 function aktt_init() {
 	if (!function_exists('wp_schedule_event')) {
 		die('Sorry, Twitter Tools requires WordPress 2.1 or later. You should remove the twitter-tools.php file from your wp-content/plugins directory until you upgrade.');
@@ -305,20 +471,122 @@ function aktt_init() {
 }
 add_action('init', 'aktt_init');
 
+function aktt_head() {
+	global $aktt;
+	if ($aktt->tweet_from_sidebar) {
+		wp_enqueue_script('prototype');
+		print('
+			<link rel="stylesheet" type="text/css" href="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_css" />
+			<script type="text/javascript" src="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_js"></script>
+		');
+	}
+}
+add_action('wp_head', 'aktt_head');
+
+function aktt_head_admin() {
+	print('<link rel="stylesheet" type="text/css" href="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_css_admin" />');
+}
+add_action('admin_head', 'aktt_head_admin');
+
 function aktt_request_handler() {
 	global $wpdb, $aktt;
 	if (!empty($_GET['ak_action'])) {
 		switch($_GET['ak_action']) {
 			case 'aktt_update_tweets':
 				aktt_update_tweets();
-				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&updated=true');
+				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&tweets-updated=true');
 				die();
 				break;
-case 'temp_post_tweet':
-	$tweet = new aktt_tweet();
-	$tweet->tw_text = 'Another API test post.';
-	$aktt->post_tweet($tweet);
-	die('posted');
+			case 'aktt_js':
+				header("Content-type: text/javascript");
+?>
+function akttPostTweet() {
+	var tweet_field = $('aktt_tweet_text');
+	var tweet_text = tweet_field.value;
+	if (tweet_text == '') {
+		return;
+	}
+	var tweet_msg = $("aktt_tweet_posted_msg");
+	var akttAjax = new Ajax.Updater(
+		tweet_msg,
+		"<?php bloginfo('wpurl'); ?>/index.php",
+		{
+			method: "post",
+			parameters: "ak_action=aktt_post_tweet_sidebar&aktt_tweet_text=" + tweet_text,
+			onComplete: akttSetReset
+		}
+	);
+	tweet_field.value = '';
+	tweet_field.focus();
+	$('aktt_char_count').innerHTML = '';
+	tweet_msg.style.display = 'block';
+}
+function akttSetReset() {
+	setTimeout('akttReset();', 2000);
+}
+function akttReset() {
+	$('aktt_tweet_posted_msg').style.display = 'none';
+}
+<?php
+				die();
+				break;
+			case 'aktt_css':
+				header("Content-type: text/css");
+?>
+#aktt_tweet_form {
+	margin: 0;
+	padding: 5px 0;
+}
+#aktt_tweet_form fieldset {
+	border: 0;
+}
+#aktt_tweet_form fieldset #aktt_tweet_submit {
+	float: right;
+	margin-right: 10px;
+}
+#aktt_tweet_form fieldset #aktt_char_count {
+	color: #666;
+}
+#aktt_tweet_posted_msg {
+	background: #ffc;
+	display: none;
+	margin: 0 0 5px 0;
+	padding: 5px;
+}
+#aktt_tweet_form div.clear {
+	clear: both;
+	float: none;
+}
+<?php
+				die();
+				break;
+			case 'aktt_css_admin':
+				header("Content-type: text/css");
+?>
+#aktt_tweet_form {
+	margin: 0;
+	padding: 5px 0;
+}
+#aktt_tweet_form fieldset {
+	border: 0;
+}
+#aktt_tweet_form fieldset textarea {
+	width: 95%;
+}
+#aktt_tweet_form fieldset #aktt_tweet_submit {
+	float: right;
+	margin-right: 50px;
+}
+#aktt_tweet_form fieldset #aktt_char_count {
+	color: #666;
+}
+#ak_twittertools fieldset.options p span {
+	color: #666;
+	display: block;
+}
+<?php
+				die();
+				break;
 		}
 	}
 	if (!empty($_POST['ak_action'])) {
@@ -329,18 +597,50 @@ case 'temp_post_tweet':
 				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&updated=true');
 				die();
 				break;
-			case 'aktt_post_tweet_admin':
-				if (!empty($_POST['aktt_tw_text'])) {
+			case 'aktt_post_tweet_sidebar':
+				if (!empty($_POST['aktt_tweet_text'])) {
 					$tweet = new aktt_tweet();
-					$tweet->tw_text = $_POST['aktt_tw_text'];
-					$aktt->post_tweet($tweet);
-					die('posted');
+					$tweet->tw_text = $_POST['aktt_tweet_text'];
+					$aktt->do_tweet($tweet);
+					die(__('Tweet posted.', 'twitter-tools'));
+				}
+				break;
+			case 'aktt_post_tweet_admin':
+				if (!empty($_POST['aktt_tweet_text'])) {
+					$tweet = new aktt_tweet();
+					$tweet->tw_text = $_POST['aktt_tweet_text'];
+					$aktt->do_tweet($tweet);
+					header('Location: '.get_bloginfo('wpurl').'/wp-admin/post-new.php?page=twitter-tools.php&tweet-posted=true');
+					die();
 				}
 				break;
 		}
 	}
 }
 add_action('init', 'aktt_request_handler', 10);
+
+function aktt_admin_tweet_form() {
+	global $aktt;
+	if ( $_GET['tweet-posted'] ) {
+		print('
+			<div id="message" class="updated fade">
+				<p>'.__('Tweet posted.', 'twitter-tools').'</p>
+			</div>
+		');
+	}
+	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
+		print('
+<p>Please enter your <a href="http://twitter.com">Twitter</a> account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.</p>		
+		');
+	}
+	print('
+		<div class="wrap">
+			<h2>'.__('Write Tweet', 'twitter-tools').'</h2>
+			<p>This will create a new \'tweet\' in <a href="http://twitter.com">Twitter</a> using the account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.</p>
+			'.aktt_tweet_form('textarea').'
+		</div>
+	');
+}
 
 function aktt_options_form() {
 	global $wpdb, $aktt;
@@ -359,50 +659,43 @@ function aktt_options_form() {
 		}
 		$cat_options .= "\n\t<option value='$category->cat_ID' $selected>$category->cat_name</option>";
 	}
-	if ($aktt->create_blog_posts == '0') {
-		$blog_post_options = '
-			<option value="0" selected="selected">'.__('No', 'twitter-tools').'</option>
-			<option value="1">'.__('Yes', 'twitter-tools').'</option>
-		';
+	$yes_no = array(
+		'create_blog_posts'
+		, 'create_digest'
+		, 'notify_twitter'
+		, 'tweet_from_sidebar'
+		, 'give_tt_credit'
+	);
+	foreach ($yes_no as $key) {
+		$var = $key.'_options';
+		if ($aktt->$key == '0') {
+			$$var = '
+				<option value="0" selected="selected">'.__('No', 'twitter-tools').'</option>
+				<option value="1">'.__('Yes', 'twitter-tools').'</option>
+			';
+		}
+		else {
+			$$var = '
+				<option value="0">'.__('No', 'twitter-tools').'</option>
+				<option value="1" selected="selected">'.__('Yes', 'twitter-tools').'</option>
+			';
+		}
 	}
-	else {
-		$blog_post_options = '
-			<option value="0">'.__('No', 'twitter-tools').'</option>
-			<option value="1" selected="selected">'.__('Yes', 'twitter-tools').'</option>
-		';
-	}
-	if ($aktt->create_digest == '0') {
-		$digest_options = '
-			<option value="0" selected="selected">'.__('No', 'twitter-tools').'</option>
-			<option value="1">'.__('Yes', 'twitter-tools').'</option>
-		';
-	}
-	else {
-		$digest_options = '
-			<option value="0">'.__('No', 'twitter-tools').'</option>
-			<option value="1" selected="selected">'.__('Yes', 'twitter-tools').'</option>
-		';
-	}
-	if ($aktt->notify_twitter == '0') {
-		$notify_twitter_options = '
-			<option value="0" selected="selected">'.__('No', 'twitter-tools').'</option>
-			<option value="1">'.__('Yes', 'twitter-tools').'</option>
-		';
-	}
-	else {
-		$notify_twitter_options = '
-			<option value="0">'.__('No', 'twitter-tools').'</option>
-			<option value="1" selected="selected">'.__('Yes', 'twitter-tools').'</option>
-		';
+	if ( $_GET['tweets-updated'] ) {
+		print('
+			<div id="message" class="updated fade">
+				<p>'.__('Tweets updated.', 'twitter-tools').'</p>
+			</div>
+		');
 	}
 	print('
 			<div class="wrap">
 				<h2>'.__('Twitter Tools Options', 'twitter-tools').'</h2>
-				<form name="ak_twittertools" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="post">
+				<form id="ak_twittertools" name="ak_twittertools" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="post">
 					<fieldset class="options">
 						<p>
 							<label for="aktt_twitter_username">'.__('Twitter Username:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" />
+							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" />
 						</p>
 						<p>
 							<label for="aktt_twitter_id">'.__('Twitter ID:', 'twitter-tools').'</label>
@@ -411,24 +704,37 @@ function aktt_options_form() {
 						</p>
 						<p>
 							<label for="aktt_twitter_password">'.__('Twitter Password:', 'twitter-tools').'</label>
-							<input type="password" size="30" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" />
-							<span>'.__('This is only needed if you want to post a new Tweet when you add a blog post, or post to Twitter from within your WP admin panel.', 'twitter-tools').'</span>
+							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" />
+							<span>'.__('This is only needed if you want to post a new Tweet when you add a blog post, or post to Twitter from your blog.', 'twitter-tools').'</span>
 						</p>
 						<p>
-							<label for="aktt_notify_twitter">'.__('Create a tweet when you post in your blog?:', 'twitter-tools').'</label>
+							<label for="aktt_notify_twitter">'.__('Create a tweet when you post in your blog?', 'twitter-tools').'</label>
 							<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
 						</p>
 						<p>
-							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?:', 'twitter-tools').'</label>
-							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$blog_post_options.'</select>
+							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
+							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
 						</p>
 						<p>
-							<label for="aktt_create_digests">THIS DOES NOT WORK YET'.__('Create a daily digest blog post from your tweets?:', 'twitter-tools').'</label>
-							<select name="aktt_create_digests" id="aktt_create_digests">'.$digest_options.'</select>
+							<label for="aktt_create_digests">THIS DOES NOT WORK YET &raquo; '.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
+							<select name="aktt_create_digests" id="aktt_create_digests">'.$create_digest_options.'</select>
 						</p>
 						<p>
 							<label for="aktt_blog_post_category">'.__('Select a category for your tweets:', 'twitter-tools').'</label>
 							<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
+						</p>
+						<p>
+							<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
+							<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.$aktt->sidebar_tweet_count.'" />
+							<span>'.__('Numbers only please.', 'twitter-tools').'</span>
+						</p>
+						<p>
+							<label for="aktt_tweet_from_sidebar">'.__('Create tweets from your sidebar?', 'twitter-tools').'</label>
+							<select name="aktt_tweet_from_sidebar" id="aktt_tweet_from_sidebar">'.$tweet_from_sidebar_options.'</select>
+						</p>
+						<p>
+							<label for="aktt_give_tt_credit">'.__('Give Twitter Tools credit?', 'twitter-tools').'</label>
+							<select name="aktt_give_tt_credit" id="aktt_give_tt_credit">'.$give_tt_credit_options.'</select>
 						</p>
 						<input type="hidden" name="ak_action" value="aktt_update_settings" />
 					</fieldset>
@@ -448,16 +754,28 @@ function aktt_options_form() {
 	');
 }
 
-function aktt_options() {
-	add_options_page(
-		__('Twitter Tools Options', 'twitter-tools')
-		, __('Twitter Tools', 'twitter-tools')
-		, 10
-		, basename(__FILE__)
-		, 'aktt_options_form'
-	);
+function aktt_menu_items() {
+	if (current_user_can('manage_options')) {
+		add_options_page(
+			__('Twitter Tools Options', 'twitter-tools')
+			, __('Twitter Tools', 'twitter-tools')
+			, 10
+			, basename(__FILE__)
+			, 'aktt_options_form'
+		);
+	}
+	if (current_user_can('publish_posts')) {
+		add_submenu_page(
+			'post-new.php'
+			, __('Write Tweet', 'twitter-tools')
+			, __('Write Tweet', 'twitter-tools')
+			, 10
+			, basename(__FILE__)
+			, 'aktt_admin_tweet_form'
+		);
+	}
 }
-add_action('admin_menu', 'aktt_options');
+add_action('admin_menu', 'aktt_menu_items');
 
 if (!function_exists('trim_add_elipsis')) {
 	function trim_add_elipsis($string, $limit = 100) {
