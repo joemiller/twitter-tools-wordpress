@@ -13,7 +13,8 @@ Twitter Tools integrates with Twitter by giving you the following functionality:
 
 * Archive your Twitter tweets (downloaded every hour)
 * Create a blog post from each of your tweets
-* Create a tweet whenever you post in your blog, with a link to the blog post
+* Create a daily archive of Twitter tweets
+* Create a tweet on Twitter whenever you post in your blog, with a link to the blog post
 * Post a tweet from your sidebar
 * Post a tweet from the WP Admin screens
 
@@ -28,7 +29,7 @@ Twitter Tools integrates with Twitter by giving you the following functionality:
 
 == Configuration ==
 
-* * * * * * Options description here
+There are a number of configuration options for Twitter Tools. You can find these in Options > Twitter Tools.
 
 
 == Showing Your Tweets ==
@@ -47,9 +48,9 @@ If you are not using widgest, you can use a template tag to add your latest twee
 
 == Known Issues ==
 
-Only one Twitter account is supported (not one account per author).
-
-PHP's fopen functionality must be enabled to download tweets from Twitter.
+* Only one Twitter account is supported (not one account per author).
+* PHP's fopen functionality must be enabled to download tweets from Twitter.
+* The relative date function isn't fully localized.
 
 
 == Frequently Asked Questions ==

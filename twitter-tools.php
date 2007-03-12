@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.0dev
+Version: 1.0beta
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -179,6 +179,7 @@ class twitter_tools {
 		$snoop->user = $this->twitter_username;
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
+		do_action('aktt_do_tweet', $tweet);
 	}
 	
 	function do_blog_post_tweet($post_id = 0) {
@@ -225,7 +226,7 @@ class twitter_tools {
 			ORDER BY tw_created_at
 		");
 		if (count($tweets) > 0) {
-			$content = '<ul class="aktt_tweets">'."\n";
+			$content = '<ul class="aktt_tweet_digest">'."\n";
 			foreach ($tweets as $tweet) {
 				$content .= '	<li>'.$tweet->tw_text.' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
 			}
@@ -298,7 +299,7 @@ class aktt_tweet {
 			, NOW()
 			)
 		");
-		do_action('aktt_new_tweet', $this);
+		do_action('aktt_archive_tweet', $this);
 		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification()) {
 			$aktt->do_tweet_post($this);
 		}
@@ -367,10 +368,9 @@ function aktt_sidebar_tweets() {
 	");
 	if (count($tweets) > 0) {
 		$output = '<div class="aktt_tweets">'."\n"
-			.'	<h2>'.__("What I'm Doing", 'twitter-tools').'</h2>'."\n"
 			.'	<ul>'."\n";
 		foreach ($tweets as $tweet) {
-			$output .= '		<li>'.htmlspecialchars($tweet->tw_text).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+			$output .= '		<li>'.htmlspecialchars($tweet->tw_text).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
 		}
 		$output .= '		<li><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n"
 			.'</ul>';
@@ -455,16 +455,42 @@ function aktt_widget_init() {
 	}
 	function aktt_widget($args) {
 		extract($args);
+		$options = get_option('aktt_widget');
+		$title = $options['title'];
+		if (empty($title)) {
+		}
 		echo $before_widget . $before_title . $title . $after_title;
-// TODO, abstract title
 		aktt_sidebar_tweets();
-		
 		echo $after_widget;
 	}
 	register_sidebar_widget(array(__('Twitter Tools', 'twitter-tools'), 'widgets'), 'aktt_widget');
-}
+	
+	function aktt_widget_control() {
+		$options = get_option('aktt_widget');
+		if (!is_array($options)) {
+			$options = array(
+				'title' => __("What I'm Doing...", 'twitter-tools')
+			);
+		}
+		if (isset($_POST['ak_action']) && $_POST['ak_action'] == 'aktt_update_widget_options') {
+			$options['title'] = strip_tags(stripslashes($_POST['aktt_widget_title']));
+			update_option('aktt_widget', $options);
+		}
 
-// Run our code later in case this loads prior to any required plugins.
+		// Be sure you format your options to be valid HTML attributes.
+		$title = htmlspecialchars($options['title'], ENT_QUOTES);
+		
+		// Here is our little form segment. Notice that we don't need a
+		// complete form. This will be embedded into the existing form.
+		print('
+			<p style="text-align:right;"><label for="aktt_widget_title">' . __('Title:') . ' <input style="width: 200px;" id="aktt_widget_title" name="aktt_widget_title" type="text" value="'.$title.'" /></label></p>
+			<p>'.__('Find additional Twitter Tools options on the <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options page</a>.', 'twitter-tools').'
+			<input type="hidden" id="ak_action" name="ak_action" value="aktt_update_widget_options" />
+		');
+	}
+	register_widget_control(array(__('Twitter Tools', 'twitter-tools'), 'widgets'), 'aktt_widget_control', 300, 100);
+
+}
 add_action('widgets_init', 'aktt_widget_init');
 
 function aktt_init() {
@@ -811,6 +837,91 @@ if (!function_exists('trim_add_elipsis')) {
 	}
 }
 
+/**
+
+from: http://www.gyford.com/phil/writing/2006/12/02/quick_twitter.php
+
+	 * Returns a relative date, eg "4 hrs ago".
+	 *
+	 * Assumes the passed-in can be parsed by strtotime.
+	 * Precision could be one of:
+	 * 	1	5 hours, 3 minutes, 2 seconds ago (not yet implemented).
+	 * 	2	5 hours, 3 minutes
+	 * 	3	5 hours
+	 *
+	 * This is all a little overkill, but copied from other places I've used it.
+	 * Also superfluous, now I've noticed that the Twitter API includes something
+	 * similar, but this version is more accurate and less verbose.
+	 *
+	 * @access private.
+	 * @param string date In a format parseable by strtotime().
+	 * @param integer precision
+	 * @return string
+	 */
+function aktt_relativeTime ($date, $precision=2)
+{
+	$time = strtotime($date);
+	$now = gmmktime();
+
+	$diff 	=  $now - $time;
+	$months	=  floor($diff/2419200);
+	$diff 	-= $months * 2419200;
+	$weeks 	=  floor($diff/604800);
+	$diff	-= $weeks*604800;
+	$days 	=  floor($diff/86400);
+	$diff 	-= $days * 86400;
+	$hours 	=  floor($diff/3600);
+	$diff 	-= $hours * 3600;
+	$minutes = floor($diff/60);
+	$diff 	-= $minutes * 60;
+	$seconds = $diff;
+
+	if ($days > 30) {
+		return date('Y-m-d', $time);
+	} else {
+		$relative_date = '';
+		if ($weeks > 0) {
+			// Weeks and days
+			$relative_date .= ($relative_date?', ':'').$weeks.' week'.($weeks>1?'s':'');
+			if ($precision <= 2) {
+				$relative_date .= $days>0?($relative_date?', ':'').$days.' day'.($days>1?'s':''):'';
+				if ($precision == 1) {
+					$relative_date .= $hours>0?($relative_date?', ':'').$hours.' hr'.($hours>1?'s':''):'';
+				}
+			}
+		} elseif ($days > 0) {
+			// days and hours
+			$relative_date .= ($relative_date?', ':'').$days.' day'.($days>1?'s':'');
+			if ($precision <= 2) {
+				$relative_date .= $hours>0?($relative_date?', ':'').$hours.' hr'.($hours>1?'s':''):'';
+				if ($precision == 1) {
+					$relative_date .= $minutes>0?($relative_date?', ':'').$minutes.' min'.($minutes>1?'s':''):'';
+				}
+			}
+		} elseif ($hours > 0) {
+			// hours and minutes
+			$relative_date .= ($relative_date?', ':'').$hours.' hr'.($hours>1?'s':'');
+			if ($precision <= 2) {
+				$relative_date .= $minutes>0?($relative_date?', ':'').$minutes.' min'.($minutes>1?'s':''):'';
+				if ($precision == 1) {
+					$relative_date .= $seconds>0?($relative_date?', ':'').$seconds.' sec'.($seconds>1?'s':''):'';
+				}
+			}
+		} elseif ($minutes > 0) {
+			// minutes only
+			$relative_date .= ($relative_date?', ':'').$minutes.' min'.($minutes>1?'s':'');
+			if ($precision == 1) {
+				$relative_date .= $seconds>0?($relative_date?', ':'').$seconds.' sec'.($seconds>1?'s':''):'';
+			}
+		} else {
+			// seconds only
+			$relative_date .= ($relative_date?', ':'').$seconds.' sec'.($seconds>1?'s':'');
+		}
+	}
+
+	// Return relative date and add proper verbiage
+	return sprintf(__('%s ago', 'twitter-tools'), $relative_date);
+}
 if (!class_exists('Services_JSON')) {
 
 // PEAR JSON class
