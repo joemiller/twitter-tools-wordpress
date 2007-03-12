@@ -382,6 +382,7 @@ function aktt_sidebar_tweets() {
 	if ($aktt->give_tt_credit == '1') {
 		$output .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 	}
+	$output .= '</div>';
 	print($output);
 }
 
