@@ -31,6 +31,12 @@ Twitter Tools integrates with Twitter by giving you the following functionality:
 
 There are a number of configuration options for Twitter Tools. You can find these in Options > Twitter Tools.
 
+Twitter Tools tries to automagically figure out your Twitter ID from your Twitter Username. If that doesn't work, you can add it manually. To find your ID, go to your Twitter home page ( http://twitter.com/username ) and copy your RSS Feed url (link in the bottom right of your tweet list). For example, if your RSS URL is:
+
+http://twitter.com/statuses/user_timeline/101143.rss
+
+Your Twitter ID is: 101143
+
 
 == Showing Your Tweets ==
 
