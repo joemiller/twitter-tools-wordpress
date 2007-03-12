@@ -449,6 +449,24 @@ function aktt_tweet_form($type = 'input', $extra = '') {
 	return $output;
 }
 
+function aktt_widget_init() {
+	if (!function_exists('register_sidebar_widget')) {
+		return;
+	}
+	function aktt_widget($args) {
+		extract($args);
+		echo $before_widget . $before_title . $title . $after_title;
+// TODO, abstract title
+		aktt_sidebar_tweets();
+		
+		echo $after_widget;
+	}
+	register_sidebar_widget(array(__('Twitter Tools', 'twitter-tools'), 'widgets'), 'aktt_widget');
+}
+
+// Run our code later in case this loads prior to any required plugins.
+add_action('widgets_init', 'aktt_widget_init');
+
 function aktt_init() {
 	if (!function_exists('wp_schedule_event')) {
 		die('Sorry, Twitter Tools requires WordPress 2.1 or later. You should remove the twitter-tools.php file from your wp-content/plugins directory until you upgrade.');
@@ -583,6 +601,10 @@ function akttReset() {
 #ak_twittertools fieldset.options p span {
 	color: #666;
 	display: block;
+}
+#aktt_readme {
+	height: 300px;
+	width: 95%;
 }
 <?php
 				die();
@@ -750,6 +772,9 @@ function aktt_options_form() {
 						<input type="hidden" name="ak_action" value="aktt_update_tweets" />
 					</p>
 				</form>
+				<h2>'.__('README', 'twitter-tools').'</h2>
+				<p>'.__('Find answers to common questions here.', 'twitter-tools').'</p>
+				<iframe id="aktt_readme" src="http://alexking.org/projects/wordpress/readme?project=twitter-tools"></iframe>
 			</div>
 	');
 }
