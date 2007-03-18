@@ -189,8 +189,8 @@ class twitter_tools {
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
 		if ($snoop->response_code == '200') {
-			return true;
 			do_action('aktt_do_tweet', $tweet);
+			return true;
 		}
 		return false;
 	}
@@ -330,6 +330,10 @@ class aktt_tweet {
 }
 
 function aktt_update_tweets() {
+	if (get_option('aktt_doing_tweet_download') == '1') {
+		return;
+	}
+	update_option('aktt_doing_tweet_download', '1');
 	global $wpdb, $aktt;
 	if (empty($aktt->twitter_id)) {
 		die('You must enter your Twitter id for Twitter Tools to download your tweets.');
@@ -381,6 +385,7 @@ function aktt_update_tweets() {
 	}
 	update_option('aktt_update_hash', $hash);
 	update_option('aktt_last_tweet_download', time());
+	update_option('aktt_doing_tweet_download', '0');
 }
 
 function aktt_notify_twitter($post_id) {
