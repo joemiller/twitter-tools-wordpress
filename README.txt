@@ -11,12 +11,13 @@ Twitter Tools is a plugin that creates an integration between your WordPress blo
 
 Twitter Tools integrates with Twitter by giving you the following functionality:
 
-* Archive your Twitter tweets (downloaded every hour)
+* Archive your Twitter tweets (downloaded every 30 minutes)
 * Create a blog post from each of your tweets
 * Create a daily archive of Twitter tweets
 * Create a tweet on Twitter whenever you post in your blog, with a link to the blog post
 * Post a tweet from your sidebar
 * Post a tweet from the WP Admin screens
+* Pass your tweets along to another service (via API hook)
 
 
 == Installation ==
@@ -52,10 +53,23 @@ If you are not using widgest, you can use a template tag to add your latest twee
 `<?php aktt_sidebar_tweets(); ?>`
 
 
+== Hooks/API ==
+
+Twitter Tools contains a hook that can be used to pass along your tweet data to another service (for example, some folks have wanted to be able to update their Facebook status). To use this hook, create a plugin and add an action to:
+
+`aktt_add_tweet`
+
+Your plugin function will receive an `aktt_tweet` object as the first parameter.
+
+Example psuedo-code:
+
+`function my_status_update($tweet) { // do something here }`
+`add_action('aktt_add_tweet', 'my_status_update')`
+
+
 == Known Issues ==
 
 * Only one Twitter account is supported (not one account per author).
-* PHP's fopen functionality must be enabled to download tweets from Twitter.
 * The relative date function isn't fully localized.
 
 

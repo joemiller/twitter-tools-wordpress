@@ -189,7 +189,6 @@ class twitter_tools {
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
 		if ($snoop->response_code == '200') {
-			do_action('aktt_do_tweet', $tweet);
 			return true;
 		}
 		return false;
@@ -325,7 +324,7 @@ class aktt_tweet {
 			, NOW()
 			)
 		");
-		do_action('aktt_archive_tweet', $this);
+		do_action('aktt_add_tweet', $this);
 		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification()) {
 			$aktt->do_tweet_post($this);
 		}
