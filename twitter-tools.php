@@ -225,9 +225,7 @@ class twitter_tools {
 	
 	function do_digest_post() {
 		global $wpdb;
-		if ($this->last_digest_post == ''
-			|| $this->doing_digest_post == '1'
-			|| $this->last_digest_post != date('Y-m-d', strtotime('-2 days'))) {
+		if ($this->create_digest != '1' || get_option('aktt_doing_digest_post') == '1') {
 			return;
 		}
 		update_option('aktt_doing_digest_post', '1');
@@ -386,6 +384,11 @@ function aktt_update_tweets() {
 	update_option('aktt_update_hash', $hash);
 	update_option('aktt_last_tweet_download', time());
 	update_option('aktt_doing_tweet_download', '0');
+	if ($aktt->create_digest == '1') {
+		if (strtotime(get_option('aktt_last_digest_post')) < strtotime(date('Y-m-d 00:00:00', ak_gmmktime()))) {
+			add_action('shutdown', 'aktt_create_digest');
+		}
+	}
 }
 
 function aktt_notify_twitter($post_id) {
@@ -553,10 +556,6 @@ function aktt_init() {
 	$aktt->get_settings();
 	if (($aktt->last_tweet_download + $aktt->tweet_download_interval()) < time()) {
 		add_action('shutdown', 'aktt_update_tweets');
-	}
-	$yesterday = strtotime('-1 day', ak_gmmktime());
-	if (strtotime(get_option('aktt_last_digest_post')) < strtotime(date('Y-m-d 00:00:00', $yesterday))) {
-//		add_action('shutdown', 'aktt_create_digest');
 	}
 }
 add_action('init', 'aktt_init');
