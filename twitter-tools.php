@@ -225,10 +225,15 @@ class twitter_tools {
 	
 	function do_digest_post() {
 		global $wpdb;
+
 		if ($this->create_digest != '1' || get_option('aktt_doing_digest_post') == '1') {
 			return;
 		}
 		update_option('aktt_doing_digest_post', '1');
+
+// TODO loop here for n days from last digest post to the most recent
+
+
 		$now = ak_gmmktime();
 		$yesterday = strtotime('-1 day', $now);
 		$tweets = $wpdb->get_results("
@@ -384,10 +389,8 @@ function aktt_update_tweets() {
 	update_option('aktt_update_hash', $hash);
 	update_option('aktt_last_tweet_download', time());
 	update_option('aktt_doing_tweet_download', '0');
-	if ($aktt->create_digest == '1') {
-		if (strtotime(get_option('aktt_last_digest_post')) < strtotime(date('Y-m-d 00:00:00', ak_gmmktime()))) {
-			add_action('shutdown', 'aktt_create_digest');
-		}
+	if ($aktt->create_digest == '1' && strtotime(get_option('aktt_last_digest_post')) < strtotime(date('Y-m-d 00:00:00', ak_gmmktime()))) {
+		$aktt->do_digest_post();
 	}
 }
 
@@ -396,11 +399,6 @@ function aktt_notify_twitter($post_id) {
 	$aktt->do_blog_post_tweet($post_id);
 }
 add_action('publish_post', 'aktt_notify_twitter');
-
-function aktt_create_digest() {
-	global $aktt;
-	$aktt->do_digest_post();
-}
 
 function aktt_sidebar_tweets() {
 	global $wpdb, $aktt;
