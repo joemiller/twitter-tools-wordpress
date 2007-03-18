@@ -49,17 +49,22 @@ class twitter_tools {
 			, 'twitter_id'
 			, 'create_blog_posts'
 			, 'create_digest'
+			, 'digest_title'
 			, 'blog_post_category'
 			, 'notify_twitter'
 			, 'sidebar_tweet_count'
 			, 'tweet_from_sidebar'
 			, 'give_tt_credit'
+			, 'last_tweet_download'
+			, 'doing_tweet_download'
+			, 'doing_digest_post'
 		);
 		$this->twitter_username = '';
 		$this->twitter_password = '';
 		$this->twitter_id = '';
 		$this->create_blog_posts = '0';
 		$this->create_digest = '0';
+		$this->digest_title = __("Twitter Updates for %s", 'twitter-tools');
 		$this->blog_post_category = '1';
 		$this->notify_twitter = '0';
 		$this->sidebar_tweet_count = '3';
@@ -70,6 +75,9 @@ class twitter_tools {
 		$this->tweet_prefix = 'New blog post';
 		$this->tweet_format = $this->tweet_prefix.': %s %s';
 		$this->last_digest_post = '';
+		$this->last_tweet_download = '';
+		$this->doing_tweet_download = '0';
+		$this->doing_digest_post = '0';
 	}
 
 	function install() {
@@ -88,7 +96,6 @@ class twitter_tools {
 			add_option('aktt_'.$option, $this->$option);
 		}
 		add_option('aktt_update_hash', '');
-		wp_schedule_event(strtotime('+1 hour'), 'hourly', 'aktt_update_tweets');
 	}
 
 	function get_settings() {
@@ -124,15 +131,13 @@ class twitter_tools {
 	}
 	
 	function initiate_digests() {
-		$this->last_digest_post = date('Y-m-d H:i:s');
+		$this->last_digest_post = date('Y-m-d 00:00:00', strtotime('-1 day'));
 		if (get_option('aktt_last_digest_post') == '') {
 			add_option('aktt_last_digest_post', $this->last_digest_post);
 		}
 		else {
 			update_option('aktt_last_digest_post', $this->last_digest_post);
 		}
-// TODO
-//		wp_schedule_event(strtotime('+1 hour'), 'daily', 'aktt_create_digest');
 	}
 
 	function get_twitter_id() {
@@ -165,6 +170,10 @@ class twitter_tools {
 		return false;
 	}
 	
+	function tweet_download_interval() {
+		return 1800;
+	}
+	
 	function do_tweet($tweet = '') {
 		if (empty($this->twitter_username) 
 			|| empty($this->twitter_password) 
@@ -179,7 +188,11 @@ class twitter_tools {
 		$snoop->user = $this->twitter_username;
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
-		do_action('aktt_do_tweet', $tweet);
+		if ($snoop->response_code == '200') {
+			return true;
+			do_action('aktt_do_tweet', $tweet);
+		}
+		return false;
 	}
 	
 	function do_blog_post_tweet($post_id = 0) {
@@ -197,14 +210,14 @@ class twitter_tools {
 	}
 	
 	function do_tweet_post($tweet) {
+		remove_action('publish_post', 'aktt_notify_twitter');
 		$data = array(
 			'post_content' => $tweet->tw_text
 			, 'post_title' => trim_add_elipsis($tweet->tw_text, 30)
-			, 'post_date' => date('Y-m-d H:i:s', $tweet->tw_created_at)
-			, 'post_category' => array($aktt->blog_post_category)
+			, 'post_date' => get_date_from_gmt(date('Y-m-d H:i:s', $tweet->tw_created_at))
+			, 'post_category' => array($this->blog_post_category)
 			, 'post_status' => 'publish'
 		);
-		remove_action('publish_post', 'aktt_notify_twitter');
 		$post_id = wp_insert_post($data);
 		add_post_meta($post_id, 'aktt_twitter_id', $tweet->tw_id, true);
 		add_action('publish_post', 'aktt_notify_twitter');
@@ -212,17 +225,19 @@ class twitter_tools {
 	
 	function do_digest_post() {
 		global $wpdb;
-		
-// TODO
-		// need some date mojo here
-		$last_post = $this->last_digest_post;
-		if ($last_post == '') {
+		if ($this->last_digest_post == ''
+			|| $this->doing_digest_post == '1'
+			|| $this->last_digest_post != date('Y-m-d', strtotime('-2 days'))) {
 			return;
 		}
+		update_option('aktt_doing_digest_post', '1');
+		$now = ak_gmmktime();
+		$yesterday = strtotime('-1 day', $now);
 		$tweets = $wpdb->get_results("
 			SELECT *
 			FROM $wpdb->aktt
-			WHERE tw_created_at > '".mysql_real_escape_string($last_post)."'
+			WHERE tw_created_at >= '".date('Y-m-d 00:00:00', $yesterday)."'
+			AND tw_created_at <= '".date('Y-m-d 23:59:59', $yesterday)."'
 			ORDER BY tw_created_at
 		");
 		if (count($tweets) > 0) {
@@ -234,9 +249,18 @@ class twitter_tools {
 			if ($this->give_tt_credit == '1') {
 				$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 			}
+			$data = array(
+				'post_content' => $content
+				, 'post_title' => sprintf($this->digest_title, date('Y-m-d', $yesterday))
+				, 'post_date' => date('Y-m-d 23:59:59', $yesterday)
+				, 'post_category' => array($this->blog_post_category)
+				, 'post_status' => 'publish'
+			);
+			$post_id = wp_insert_post($data);
 		}
-		$this->last_digest_post = date('Y-m-d H:i:s');
+		$this->last_digest_post = date('Y-m-d 00:00:00', $now);
 		update_option('aktt_last_digest_post', $this->last_digest_post);
+		update_option('aktt_doing_digest_post', '0');
 	}
 }
 
@@ -256,7 +280,6 @@ class aktt_tweet {
 	function twdate_to_time($date) {
 		$parts = explode(' ', $date);
 		$date = strtotime($parts[1].' '.$parts[2].', '.$parts[5].' '.$parts[3]);
-		$date = $date + (intval(get_option('gmt_offset')) * 3600);
 		return $date;
 	}
 	
@@ -311,12 +334,24 @@ function aktt_update_tweets() {
 	if (empty($aktt->twitter_id)) {
 		die('You must enter your Twitter id for Twitter Tools to download your tweets.');
 	}
-	$json = new Services_JSON();
-	$data = file_get_contents('http://twitter.com/statuses/user_timeline/'.$aktt->twitter_id.'.json');
+	require_once(ABSPATH.WPINC.'/class-snoopy.php');
+	$snoop = new Snoopy;
+	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
+	$snoop->user = $aktt->twitter_username;
+	$snoop->pass = $aktt->twitter_password;
+	$snoop->fetch('http://twitter.com/statuses/user_timeline/'.$aktt->twitter_id.'.json');
+
+// will uncomment this when it's supported
+// http://groups.google.com/group/twitter-development-talk/browse_thread/thread/30e8c1c7f7cc97ba
+//	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
+
+	$data = $snoop->results;
+
 	$hash = md5($data);
 	if ($hash == $aktt->update_hash) {
 		return;
 	}
+	$json = new Services_JSON();
 	$tweets = $json->decode($data);
 	if (is_array($tweets) && count($tweets) > 0) {
 		$tweet_ids = array();
@@ -345,6 +380,7 @@ function aktt_update_tweets() {
 		}
 	}
 	update_option('aktt_update_hash', $hash);
+	update_option('aktt_last_tweet_download', time());
 }
 
 function aktt_notify_twitter($post_id) {
@@ -366,15 +402,18 @@ function aktt_sidebar_tweets() {
 		ORDER BY tw_created_at DESC
 		LIMIT $aktt->sidebar_tweet_count
 	");
+	$output = '<div class="aktt_tweets">'."\n"
+		.'	<ul>'."\n";
 	if (count($tweets) > 0) {
-		$output = '<div class="aktt_tweets">'."\n"
-			.'	<ul>'."\n";
 		foreach ($tweets as $tweet) {
-			$output .= '		<li>'.htmlspecialchars($tweet->tw_text).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
+			$output .= '		<li>'.make_clickable(htmlspecialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
 		}
-		$output .= '		<li><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n"
-			.'</ul>';
 	}
+	else {
+		$output .= '		<li>'.__('No tweets available at the moment.', 'twitter-tools').'</li>'."\n";
+	}
+	$output .= '		<li><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n"
+		.'</ul>';
 	if ($aktt->tweet_from_sidebar == '1') {
 		$output .= aktt_tweet_form('input', 'onsubmit="akttPostTweet(); return false;"');
 		$output .= '	<p id="aktt_tweet_posted_msg">'.__('Posting tweet...', 'twitter-tools').'</p>';
@@ -390,14 +429,14 @@ function aktt_tweet_form($type = 'input', $extra = '') {
 	$output = '';
 	if (current_user_can('publish_posts')) {
 		$output .= '
-<form action="'.get_bloginfo('wpurl').'/index.php" id="aktt_tweet_form" '.$extra.'>
+<form action="'.get_bloginfo('wpurl').'/index.php" method="post" id="aktt_tweet_form" '.$extra.'>
 	<fieldset>
 		';
 		switch ($type) {
 			case 'input':
 				$output .= '
 		<p><input type="text" size="20" maxlength="140" id="aktt_tweet_text" name="aktt_tweet_text" onkeyup="akttCharCount();" /></p>
-		<input type="hidden" name="ak_action" value="post_tweet_sidebar" />
+		<input type="hidden" name="ak_action" value="aktt_post_tweet_sidebar" />
 		<script type="text/javascript">
 		//<![CDATA[
 		function akttCharCount() {
@@ -418,7 +457,7 @@ function aktt_tweet_form($type = 'input', $extra = '') {
 			case 'textarea':
 				$output .= '
 		<p><textarea type="text" cols="60" rows="5" maxlength="140" id="aktt_tweet_text" name="aktt_tweet_text" onkeyup="akttCharCount();"></textarea></p>
-		<input type="hidden" name="ak_action" value="post_tweet_admin" />
+		<input type="hidden" name="ak_action" value="aktt_post_tweet_admin" />
 		<script type="text/javascript">
 		//<![CDATA[
 		function akttCharCount() {
@@ -495,15 +534,9 @@ function aktt_widget_init() {
 add_action('widgets_init', 'aktt_widget_init');
 
 function aktt_init() {
-	if (!function_exists('wp_schedule_event')) {
-		die('Sorry, Twitter Tools requires WordPress 2.1 or later. You should remove the twitter-tools.php file from your wp-content/plugins directory until you upgrade.');
-	}
-	global $wpdb, $table_prefix, $aktt;
-
-	$wpdb->aktt = $table_prefix.'ak_twitter';
-
+	global $wpdb, $aktt;
 	$aktt = new twitter_tools;
-	
+	$wpdb->aktt = $wpdb->prefix.'ak_twitter';
 	if (isset($_GET['activate']) && $_GET['activate'] == 'true') {
 		$tables = $wpdb->get_col("
 			SHOW TABLES
@@ -513,6 +546,13 @@ function aktt_init() {
 		}
 	}
 	$aktt->get_settings();
+	if (($aktt->last_tweet_download + $aktt->tweet_download_interval()) < time()) {
+		add_action('shutdown', 'aktt_update_tweets');
+	}
+	$yesterday = strtotime('-1 day', ak_gmmktime());
+	if (strtotime(get_option('aktt_last_digest_post')) < strtotime(date('Y-m-d 00:00:00', $yesterday))) {
+//		add_action('shutdown', 'aktt_create_digest');
+	}
 }
 add_action('init', 'aktt_init');
 
@@ -649,15 +689,19 @@ function akttReset() {
 			case 'aktt_post_tweet_sidebar':
 				if (!empty($_POST['aktt_tweet_text'])) {
 					$tweet = new aktt_tweet();
-					$tweet->tw_text = $_POST['aktt_tweet_text'];
-					$aktt->do_tweet($tweet);
-					die(__('Tweet posted.', 'twitter-tools'));
+					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
+					if ($aktt->do_tweet($tweet)) {
+						die(__('Tweet posted.', 'twitter-tools'));
+					}
+					else {
+						die(__('Tweet post failed.', 'twitter-tools'));
+					}
 				}
 				break;
 			case 'aktt_post_tweet_admin':
 				if (!empty($_POST['aktt_tweet_text'])) {
 					$tweet = new aktt_tweet();
-					$tweet->tw_text = $_POST['aktt_tweet_text'];
+					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
 					$aktt->do_tweet($tweet);
 					header('Location: '.get_bloginfo('wpurl').'/wp-admin/post-new.php?page=twitter-tools.php&tweet-posted=true');
 					die();
@@ -765,8 +809,13 @@ function aktt_options_form() {
 							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
 						</p>
 						<p>
-							<label for="aktt_create_digests">THIS DOES NOT WORK YET &raquo; '.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digests" id="aktt_create_digests">'.$create_digest_options.'</select>
+							<label for="aktt_create_digest">'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
+							<select name="aktt_create_digest" id="aktt_create_digest">'.$create_digest_options.'</select>
+						</p>
+						<p>
+							<label for="aktt_digest_title">'.__('Title for digest posts:', 'twitter-tools').'</label>
+							<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
+							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
 						</p>
 						<p>
 							<label for="aktt_blog_post_category">'.__('Select a category for your tweets:', 'twitter-tools').'</label>
@@ -838,9 +887,15 @@ if (!function_exists('trim_add_elipsis')) {
 	}
 }
 
+if (!function_exists('ak_gmmktime')) {
+	function ak_gmmktime() {
+		return gmmktime() - get_option('gmt_offset') * 3600;
+	}
+}
+
 /**
 
-from: http://www.gyford.com/phil/writing/2006/12/02/quick_twitter.php
+based on: http://www.gyford.com/phil/writing/2006/12/02/quick_twitter.php
 
 	 * Returns a relative date, eg "4 hrs ago".
 	 *
@@ -861,10 +916,22 @@ from: http://www.gyford.com/phil/writing/2006/12/02/quick_twitter.php
 	 */
 function aktt_relativeTime ($date, $precision=2)
 {
-	$time = strtotime($date);
-	$now = gmmktime();
+
+	$now = time();
+
+	$time = gmmktime(
+		substr($date, 11, 2)
+		, substr($date, 14, 2)
+		, substr($date, 17, 2)
+		, substr($date, 5, 2)
+		, substr($date, 8, 2)
+		, substr($date, 0, 4)
+	);
+
+	$time = strtotime(date('Y-m-d H:i:s', $time));
 
 	$diff 	=  $now - $time;
+
 	$months	=  floor($diff/2419200);
 	$diff 	-= $months * 2419200;
 	$weeks 	=  floor($diff/604800);
