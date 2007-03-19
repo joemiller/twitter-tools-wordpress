@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.0beta
+Version: 1.0b2
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -104,7 +104,6 @@ class twitter_tools {
 		foreach ($this->options as $option) {
 			$this->$option = get_option('aktt_'.$option);
 		}
-		
 		$this->update_hash = get_option('aktt_update_hash');
 	}
 
@@ -214,7 +213,6 @@ class twitter_tools {
 	
 	function do_tweet_post($tweet) {
 		global $wpdb;
-		
 		remove_action('publish_post', 'aktt_notify_twitter');
 		$data = array(
 			'post_content' => $wpdb->escape($tweet->tw_text)
@@ -230,44 +228,54 @@ class twitter_tools {
 	
 	function do_digest_post() {
 		global $wpdb;
-
 		if ($this->create_digest != '1' || get_option('aktt_doing_digest_post') == '1') {
 			return;
 		}
 		update_option('aktt_doing_digest_post', '1');
-
-// TODO loop here for n days from last digest post to the most recent
-
+		remove_action('publish_post', 'aktt_notify_twitter');
 
 		$now = ak_gmmktime();
 		$yesterday = strtotime('-1 day', $now);
-		$tweets = $wpdb->get_results("
-			SELECT *
-			FROM $wpdb->aktt
-			WHERE tw_created_at >= '".date('Y-m-d 00:00:00', $yesterday)."'
-			AND tw_created_at <= '".date('Y-m-d 23:59:59', $yesterday)."'
-			ORDER BY tw_created_at
-		");
-		if (count($tweets) > 0) {
-			$content = '<ul class="aktt_tweet_digest">'."\n";
-			foreach ($tweets as $tweet) {
-				$content .= '	<li>'.$tweet->tw_text.' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+		$last_post = get_option('aktt_last_digest_post');
+		
+		if ($last_post != date('Y-m-d 00:00:00', $yesterday)) {
+			$days = ceil((strtotime(date('Y-m-d 00:00:00', $yesterday)) - strtotime($last_post)) / (3600 * 24));
+		}
+		else {
+			$days = 1;
+		}
+		for ($i = 0; $i < $days; $i++) {
+			$n = 1 + $days - $i;
+			$digest_day = strtotime('-'.$n.' days', $now);
+			$tweets = $wpdb->get_results("
+				SELECT *
+				FROM $wpdb->aktt
+				WHERE tw_created_at >= '".date('Y-m-d 00:00:00', $digest_day)."'
+				AND tw_created_at <= '".date('Y-m-d 23:59:59', $digest_day)."'
+				ORDER BY tw_created_at
+			");
+			if (count($tweets) > 0) {
+				$content = '<ul class="aktt_tweet_digest">'."\n";
+				foreach ($tweets as $tweet) {
+					$content .= '	<li>'.$tweet->tw_text.' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+				}
+				$content .= '</ul>'."\n";
+				if ($this->give_tt_credit == '1') {
+					$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+				}
+				$data = array(
+					'post_content' => $wpdb->escape($content)
+					, 'post_title' => $wpdb->escape(sprintf($this->digest_title, date('Y-m-d', $digest_day)))
+					, 'post_date' => date('Y-m-d 23:59:59', $digest_day)
+					, 'post_category' => array($this->blog_post_category)
+					, 'post_status' => 'publish'
+				);
+				$post_id = wp_insert_post($data);
 			}
-			$content .= '</ul>'."\n";
-			if ($this->give_tt_credit == '1') {
-				$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
-			}
-			$data = array(
-				'post_content' => $wpdb->escape($content)
-				, 'post_title' => $wpdb->escape(sprintf($this->digest_title, date('Y-m-d', $yesterday)))
-				, 'post_date' => date('Y-m-d 23:59:59', $yesterday)
-				, 'post_category' => array($this->blog_post_category)
-				, 'post_status' => 'publish'
-			);
-			$post_id = wp_insert_post($data);
 		}
 		$this->last_digest_post = date('Y-m-d 00:00:00', $now);
 		update_option('aktt_last_digest_post', $this->last_digest_post);
+		add_action('publish_post', 'aktt_notify_twitter');
 		update_option('aktt_doing_digest_post', '0');
 	}
 }
