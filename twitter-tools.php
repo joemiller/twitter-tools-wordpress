@@ -144,8 +144,12 @@ class twitter_tools {
 	}
 
 	function get_twitter_id() {
-		$data = file('http://twitter.com/'.$this->twitter_username);
-		if ($data) {
+		require_once(ABSPATH.WPINC.'/class-snoopy.php');
+		$snoop = new Snoopy;
+		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
+		$snoop->fetch('http://twitter.com/'.$this->twitter_username);
+		if ($snoop->status == '200') {
+			$data = explode("\n", $snoop->results);
 			$needles = array(
 				'<link rel="alternate" type="application/rss+xml" title="'
 				, ' (RSS)" href="http://twitter.com/statuses/user_timeline/'
@@ -245,7 +249,7 @@ class twitter_tools {
 			$days = 1;
 		}
 		for ($i = 0; $i < $days; $i++) {
-			$n = 1 + $days - $i;
+			$n = $days - $i;
 			$digest_day = strtotime('-'.$n.' days', $now);
 			$tweets = $wpdb->get_results("
 				SELECT *
@@ -255,22 +259,32 @@ class twitter_tools {
 				ORDER BY tw_created_at
 			");
 			if (count($tweets) > 0) {
-				$content = '<ul class="aktt_tweet_digest">'."\n";
-				foreach ($tweets as $tweet) {
-					$content .= '	<li>'.$tweet->tw_text.' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+				$tweets_to_post = array();
+				foreach ($tweets as $data) {
+					$tweet = new aktt_tweet;
+					$tweet->tw_text = $data->tw_text;
+					if (!$tweet->tweet_is_post_notification()) {
+						$tweets_to_post[] = $data;
+					}
 				}
-				$content .= '</ul>'."\n";
-				if ($this->give_tt_credit == '1') {
-					$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+				if (count($tweets_to_post) > 0) {
+					$content = '<ul class="aktt_tweet_digest">'."\n";
+					foreach ($tweets_to_post as $tweet) {
+						$content .= '	<li>'.make_clickable($tweet->tw_text).' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+					}
+					$content .= '</ul>'."\n";
+					if ($this->give_tt_credit == '1') {
+						$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+					}
+					$data = array(
+						'post_content' => $wpdb->escape($content)
+						, 'post_title' => $wpdb->escape(sprintf($this->digest_title, date('Y-m-d', $digest_day)))
+						, 'post_date' => date('Y-m-d 23:59:59', $digest_day)
+						, 'post_category' => array($this->blog_post_category)
+						, 'post_status' => 'publish'
+					);
+					$post_id = wp_insert_post($data);
 				}
-				$data = array(
-					'post_content' => $wpdb->escape($content)
-					, 'post_title' => $wpdb->escape(sprintf($this->digest_title, date('Y-m-d', $digest_day)))
-					, 'post_date' => date('Y-m-d 23:59:59', $digest_day)
-					, 'post_category' => array($this->blog_post_category)
-					, 'post_status' => 'publish'
-				);
-				$post_id = wp_insert_post($data);
 			}
 		}
 		$this->last_digest_post = date('Y-m-d 00:00:00', $now);
