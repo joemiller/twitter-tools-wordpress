@@ -196,6 +196,7 @@ class twitter_tools {
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
 		if ($snoop->response_code == '200') {
+			update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
 			return true;
 		}
 		return false;
