@@ -70,6 +70,7 @@ Example psuedo-code:
 == Known Issues ==
 
 * Only one Twitter account is supported (not one account per author).
+* Tweets are not deleted from the tweet table in your WordPress database when they are deleted from Twitter. To delete from your WordPress database, use a database admin tool like phpMyAdmin.
 * The relative date function isn't fully localized.
 
 
