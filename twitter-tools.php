@@ -16,6 +16,8 @@ Author URI: http://alexking.org
 // This is an add-on for WordPress
 // http://wordpress.org/
 //
+// Thanks to John Ford ( http://www.aldenta.com ) for his contributions.
+//
 // **********************************************************************
 // This program is distributed in the hope that it will be useful, but
 // WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -102,6 +104,8 @@ class twitter_tools {
 		foreach ($this->options as $option) {
 			$this->$option = get_option('aktt_'.$option);
 		}
+		
+		$this->update_hash = get_option('aktt_update_hash');
 	}
 
 	function update_settings() {
@@ -209,10 +213,12 @@ class twitter_tools {
 	}
 	
 	function do_tweet_post($tweet) {
+		global $wpdb;
+		
 		remove_action('publish_post', 'aktt_notify_twitter');
 		$data = array(
-			'post_content' => $tweet->tw_text
-			, 'post_title' => trim_add_elipsis($tweet->tw_text, 30)
+			'post_content' => $wpdb->escape($tweet->tw_text)
+			, 'post_title' => $wpdb->escape(trim_add_elipsis($tweet->tw_text, 30))
 			, 'post_date' => get_date_from_gmt(date('Y-m-d H:i:s', $tweet->tw_created_at))
 			, 'post_category' => array($this->blog_post_category)
 			, 'post_status' => 'publish'
@@ -252,8 +258,8 @@ class twitter_tools {
 				$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 			}
 			$data = array(
-				'post_content' => $content
-				, 'post_title' => sprintf($this->digest_title, date('Y-m-d', $yesterday))
+				'post_content' => $wpdb->escape($content)
+				, 'post_title' => $wpdb->escape(sprintf($this->digest_title, date('Y-m-d', $yesterday)))
 				, 'post_date' => date('Y-m-d 23:59:59', $yesterday)
 				, 'post_category' => array($this->blog_post_category)
 				, 'post_status' => 'publish'
@@ -318,8 +324,8 @@ class aktt_tweet {
 			, modified
 			)
 			VALUES
-			( '".mysql_real_escape_string($this->tw_id)."'
-			, '".mysql_real_escape_string($this->tw_text)."'
+			( '".$wpdb->escape($this->tw_id)."'
+			, '".$wpdb->escape($this->tw_text)."'
 			, '".date('Y-m-d H:i:s', $this->tw_created_at)."'
 			, NOW()
 			)
@@ -362,7 +368,7 @@ function aktt_update_tweets() {
 	if (is_array($tweets) && count($tweets) > 0) {
 		$tweet_ids = array();
 		foreach ($tweets as $tweet) {
-			$tweet_ids[] = mysql_real_escape_string($tweet->id);
+			$tweet_ids[] = $wpdb->escape($tweet->id);
 		}
 		$existing_ids = $wpdb->get_col("
 			SELECT tw_id
@@ -372,7 +378,7 @@ function aktt_update_tweets() {
 		");
 		$new_tweets = array();
 		foreach ($tweets as $tw_data) {
-			if (!in_array($tw_data->id, $existing_ids)) {
+			if (!$existing_ids || !in_array($tw_data->id, $existing_ids)) {
 				$tweet = new aktt_tweet(
 					$tw_data->id
 					, $tw_data->text
