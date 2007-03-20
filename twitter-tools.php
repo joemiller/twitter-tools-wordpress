@@ -48,7 +48,6 @@ class twitter_tools {
 		$this->options = array(
 			'twitter_username'
 			, 'twitter_password'
-			, 'twitter_id'
 			, 'create_blog_posts'
 			, 'create_digest'
 			, 'digest_title'
@@ -63,7 +62,6 @@ class twitter_tools {
 		);
 		$this->twitter_username = '';
 		$this->twitter_password = '';
-		$this->twitter_id = '';
 		$this->create_blog_posts = '0';
 		$this->create_digest = '0';
 		$this->digest_title = __("Twitter Updates for %s", 'twitter-tools');
@@ -128,9 +126,6 @@ class twitter_tools {
 				$this->$option = $_POST['aktt_'.$option];
 			}
 		}
-		if (empty($this->twitter_id) && !empty($this->twitter_username)) {
-			$this->get_twitter_id();
-		}
 	}
 	
 	function initiate_digests() {
@@ -143,40 +138,6 @@ class twitter_tools {
 		}
 	}
 
-	function get_twitter_id() {
-		require_once(ABSPATH.WPINC.'/class-snoopy.php');
-		$snoop = new Snoopy;
-		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
-		$snoop->fetch('http://twitter.com/'.$this->twitter_username);
-		if ($snoop->status == '200') {
-			$data = explode("\n", $snoop->results);
-			$needles = array(
-				'<link rel="alternate" type="application/rss+xml" title="'
-				, ' (RSS)" href="http://twitter.com/statuses/user_timeline/'
-				, '.rss" />'
-			);
-			foreach ($data as $line) {
-				$rss = 0;
-				foreach ($needles as $needle) {
-					if (strstr($line, $needle)) {
-						$rss++;
-					}
-				}
-				if ($rss == 3) {
-					$line = trim($line);
-					$start = strpos($line, $needles[1]) + strlen($needles[1]);
-					$end = strpos($line, $needles[2]);
-					$id = substr($line, $start, ($end - $start));
-					if (strlen($id) > 0) {
-						$this->twitter_id = $id;
-						return true;
-					}
-				}
-			}
-		}
-		return false;
-	}
-	
 	function tweet_download_interval() {
 		return 1800;
 	}
@@ -275,7 +236,7 @@ class twitter_tools {
 					}
 					$content .= '</ul>'."\n";
 					if ($this->give_tt_credit == '1') {
-						$content .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+						$content .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 					}
 					$data = array(
 						'post_content' => $wpdb->escape($content)
@@ -366,19 +327,19 @@ function aktt_update_tweets() {
 	}
 	update_option('aktt_doing_tweet_download', '1');
 	global $wpdb, $aktt;
-	if (empty($aktt->twitter_id)) {
-		die('You must enter your Twitter id for Twitter Tools to download your tweets.');
+	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
+		die('You must enter your Twitter username and password for Twitter Tools to download your tweets.');
 	}
 	require_once(ABSPATH.WPINC.'/class-snoopy.php');
 	$snoop = new Snoopy;
 	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
 	$snoop->user = $aktt->twitter_username;
 	$snoop->pass = $aktt->twitter_password;
-	$snoop->fetch('http://twitter.com/statuses/user_timeline/'.$aktt->twitter_id.'.json');
+	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
 
-// will uncomment this when it's supported
-// http://groups.google.com/group/twitter-development-talk/browse_thread/thread/30e8c1c7f7cc97ba
-//	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
+	if ($snoop->status != '200') {
+		return;
+	}
 
 	$data = $snoop->results;
 
@@ -453,7 +414,7 @@ function aktt_sidebar_tweets() {
 		$output .= '	<p id="aktt_tweet_posted_msg">'.__('Posting tweet...', 'twitter-tools').'</p>';
 	}
 	if ($aktt->give_tt_credit == '1') {
-		$output .= '<p>Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+		$output .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 	}
 	$output .= '</div>';
 	print($output);
@@ -821,14 +782,8 @@ function aktt_options_form() {
 							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" />
 						</p>
 						<p>
-							<label for="aktt_twitter_id">'.__('Twitter ID:', 'twitter-tools').'</label>
-							<input type="text" size="20" name="aktt_twitter_id" id="aktt_twitter_id" value="'.$aktt->twitter_id.'" />
-							<span>'.__('Leave this blank at first and we will try to figure it out for you.', 'twitter-tools').'</span>
-						</p>
-						<p>
 							<label for="aktt_twitter_password">'.__('Twitter Password:', 'twitter-tools').'</label>
 							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" />
-							<span>'.__('This is only needed if you want to post a new Tweet when you add a blog post, or post to Twitter from your blog.', 'twitter-tools').'</span>
 						</p>
 						<p>
 							<label for="aktt_notify_twitter">'.__('Create a tweet when you post in your blog?', 'twitter-tools').'</label>
