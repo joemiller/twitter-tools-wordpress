@@ -321,10 +321,11 @@ class aktt_tweet {
 }
 
 function aktt_update_tweets() {
-	if (get_option('aktt_doing_tweet_download') == '1') {
+	// let the last update run for 10 minutes
+	if (time() - intval(get_option('aktt_doing_tweet_download')) < 600) {
 		return;
 	}
-	update_option('aktt_doing_tweet_download', '1');
+	update_option('aktt_doing_tweet_download', time());
 	global $wpdb, $aktt;
 	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
 		update_option('aktt_doing_tweet_download', '0');
