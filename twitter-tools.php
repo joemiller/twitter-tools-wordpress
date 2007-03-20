@@ -102,7 +102,6 @@ class twitter_tools {
 		foreach ($this->options as $option) {
 			$this->$option = get_option('aktt_'.$option);
 		}
-		$this->update_hash = get_option('aktt_update_hash');
 	}
 
 	function update_settings() {
@@ -328,6 +327,7 @@ function aktt_update_tweets() {
 	update_option('aktt_doing_tweet_download', '1');
 	global $wpdb, $aktt;
 	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
+		update_option('aktt_doing_tweet_download', '0');
 		die('You must enter your Twitter username and password for Twitter Tools to download your tweets.');
 	}
 	require_once(ABSPATH.WPINC.'/class-snoopy.php');
@@ -338,13 +338,15 @@ function aktt_update_tweets() {
 	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
 
 	if ($snoop->status != '200') {
+		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
 
 	$data = $snoop->results;
 
 	$hash = md5($data);
-	if ($hash == $aktt->update_hash) {
+	if ($hash == get_option('aktt_update_hash')) {
+		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
 	$json = new Services_JSON();
