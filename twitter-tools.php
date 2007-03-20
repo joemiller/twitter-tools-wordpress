@@ -154,7 +154,12 @@ class twitter_tools {
 		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
 		$snoop->user = $this->twitter_username;
 		$snoop->pass = $this->twitter_password;
-		$snoop->submit('http://twitter.com/statuses/update.json', array('status' => $tweet->tw_text));
+		$snoop->submit(
+			'http://twitter.com/statuses/update.json'
+			, array(
+				'status' => $tweet->tw_text
+			)
+		);
 		if ($snoop->response_code == '200') {
 			update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
 			return true;
@@ -165,7 +170,7 @@ class twitter_tools {
 	function do_blog_post_tweet($post_id = 0) {
 		if ($this->notify_twitter == '0'
 			|| $post_id == 0
-			|| get_post_meta($post_id, 'aktt_tweeted') == '1'
+			|| get_post_meta($post_id, 'aktt_tweeted', true) == '1'
 		) {
 			return;
 		}
