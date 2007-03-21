@@ -409,7 +409,7 @@ function aktt_sidebar_tweets() {
 		.'	<ul>'."\n";
 	if (count($tweets) > 0) {
 		foreach ($tweets as $tweet) {
-			$output .= '		<li>'.make_clickable(htmlspecialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
+			$output .= '		<li>'.make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
 		}
 	}
 	else {
