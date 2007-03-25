@@ -78,6 +78,7 @@ class twitter_tools {
 		$this->last_tweet_download = '';
 		$this->doing_tweet_download = '0';
 		$this->doing_digest_post = '0';
+		$this->version = '1.0';
 	}
 
 	function install() {
@@ -152,6 +153,11 @@ class twitter_tools {
 		require_once(ABSPATH.WPINC.'/class-snoopy.php');
 		$snoop = new Snoopy;
 		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
+		$snoop->rawheaders = array(
+			'X-Twitter-Client' => 'Twitter Tools'
+			, 'X-Twitter-Client-Version' => $this->version
+			, 'X-Twitter-Client-URL' => 'http://alexking.org/projects/wordpress/twitter-tools.xml'
+		);
 		$snoop->user = $this->twitter_username;
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit(
