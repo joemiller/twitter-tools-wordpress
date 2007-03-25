@@ -123,7 +123,7 @@ class twitter_tools {
 	function populate_settings() {
 		foreach ($this->options as $option) {
 			if (isset($_POST['aktt_'.$option])) {
-				$this->$option = $_POST['aktt_'.$option];
+				$this->$option = stripslashes($_POST['aktt_'.$option]);
 			}
 		}
 	}
