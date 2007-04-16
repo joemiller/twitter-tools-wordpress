@@ -421,7 +421,7 @@ function aktt_sidebar_tweets() {
 	else {
 		$output .= '		<li>'.__('No tweets available at the moment.', 'twitter-tools').'</li>'."\n";
 	}
-	$output .= '		<li><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n"
+	$output .= '		<li class="aktt_more_updates"><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n"
 		.'</ul>';
 	if ($aktt->tweet_from_sidebar == '1') {
 		$output .= aktt_tweet_form('input', 'onsubmit="akttPostTweet(); return false;"');
@@ -674,7 +674,7 @@ function akttReset() {
 	color: #666;
 	display: block;
 }
-#aktt_readme {
+#ak_readme {
 	height: 300px;
 	width: 95%;
 }
@@ -849,7 +849,7 @@ function aktt_options_form() {
 				</form>
 				<h2>'.__('README', 'twitter-tools').'</h2>
 				<p>'.__('Find answers to common questions here.', 'twitter-tools').'</p>
-				<iframe id="aktt_readme" src="http://alexking.org/projects/wordpress/readme?project=twitter-tools"></iframe>
+				<iframe id="ak_readme" src="http://alexking.org/projects/wordpress/readme?project=twitter-tools"></iframe>
 			</div>
 	');
 }
