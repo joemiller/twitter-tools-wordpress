@@ -164,6 +164,7 @@ class twitter_tools {
 			'http://twitter.com/statuses/update.json'
 			, array(
 				'status' => $tweet->tw_text
+				, 'source' => 'twittertools'
 			)
 		);
 		if ($snoop->response_code == '200') {
