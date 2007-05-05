@@ -334,6 +334,22 @@ class aktt_tweet {
 	}
 }
 
+function aktt_login_test($username, $password) {
+	require_once(ABSPATH.WPINC.'/class-snoopy.php');
+	$snoop = new Snoopy;
+	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
+	$snoop->user = $username;
+	$snoop->pass = $password;
+	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
+
+	if (strpos($snoop->response_code, '200')) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 function aktt_update_tweets() {
 	// let the last update run for 10 minutes
 	if (time() - intval(get_option('aktt_doing_tweet_download')) < 600) {
@@ -578,7 +594,10 @@ function aktt_head() {
 add_action('wp_head', 'aktt_head');
 
 function aktt_head_admin() {
-	print('<link rel="stylesheet" type="text/css" href="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_css_admin" />');
+	print('
+		<link rel="stylesheet" type="text/css" href="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_css_admin" />
+		<script type="text/javascript" src="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_js_admin"></script>
+	');
 }
 add_action('admin_head', 'aktt_head_admin');
 
@@ -654,6 +673,32 @@ function akttReset() {
 <?php
 				die();
 				break;
+			case 'aktt_js_admin':
+				header("Content-type: text/javascript");
+?>
+function akttTestLogin() {
+	var username = encodeURIComponent($('aktt_twitter_username').value);
+	var password = encodeURIComponent($('aktt_twitter_password').value);
+	var result = $('aktt_login_test_result');
+	result.className = 'aktt_login_result_wait';
+	result.innerHTML = '<?php _e('Testing...', 'twitter-tools'); ?>';
+	var akttAjax = new Ajax.Updater(
+		result,
+		"<?php bloginfo('wpurl'); ?>/index.php",
+		{
+			method: "post",
+			parameters: "ak_action=aktt_login_test&aktt_twitter_username=" + username + "&aktt_twitter_password=" + password,
+			onComplete: akttTestLoginResult
+		}
+	);
+}
+function akttTestLoginResult() {
+	$('aktt_login_test_result').className = 'aktt_login_result';
+	Fat.fade_element('aktt_login_test_result');
+}
+<?php
+				die();
+				break;
 			case 'aktt_css_admin':
 				header("Content-type: text/css");
 ?>
@@ -681,6 +726,17 @@ function akttReset() {
 #ak_readme {
 	height: 300px;
 	width: 95%;
+}
+#ak_twittertools #aktt_login_test_result {
+	display: inline;
+	padding: 3px;
+}
+#ak_twittertools fieldset.options p span.aktt_login_result_wait {
+	background: #ffc;
+}
+#ak_twittertools fieldset.options p span.aktt_login_result {
+	background: #CFEBF7;
+	color: #000;
 }
 <?php
 				die();
@@ -718,6 +774,18 @@ function akttReset() {
 						wp_die(__('Oops, your tweet was not posted. Please check your username and password and that Twitter is up and running happily.', 'twitter-tools'));
 					}
 					die();
+				}
+				break;
+			case 'aktt_login_test':
+				$test = @aktt_login_test(
+					@stripslashes($_POST['aktt_twitter_username'])
+					, @stripslashes($_POST['aktt_twitter_password'])
+				);
+				if ($test) {
+					die(__("Login succeeded, you're good to go.", 'twitter-tools'));
+				}
+				else {
+					die(__("Login failed, double-check that username and password.", 'twitter-tools'));
 				}
 				break;
 		}
@@ -806,6 +874,10 @@ function aktt_options_form() {
 						<p>
 							<label for="aktt_twitter_password">'.__('Twitter Password:', 'twitter-tools').'</label>
 							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" />
+						</p>
+						<p>
+							<input type="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
+							<span id="aktt_login_test_result"></span>
 						</p>
 						<p>
 							<label for="aktt_notify_twitter">'.__('Create a tweet when you post in your blog?', 'twitter-tools').'</label>
