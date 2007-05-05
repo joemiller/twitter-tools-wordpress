@@ -229,6 +229,7 @@ class twitter_tools {
 				FROM $wpdb->aktt
 				WHERE tw_created_at >= '".date('Y-m-d 00:00:00', $digest_day)."'
 				AND tw_created_at <= '".date('Y-m-d 23:59:59', $digest_day)."'
+				GROUP BY tw_id
 				ORDER BY tw_created_at
 			");
 			if (count($tweets) > 0) {
@@ -409,6 +410,7 @@ function aktt_sidebar_tweets() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
+		GROUP BY tw_id
 		ORDER BY tw_created_at DESC
 		LIMIT $aktt->sidebar_tweet_count
 	");
