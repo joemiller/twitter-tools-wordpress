@@ -2,8 +2,8 @@
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
-Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.0b3
+Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
+Version: 1.0
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -258,6 +258,7 @@ class twitter_tools {
 						, 'post_status' => 'publish'
 					);
 					$post_id = wp_insert_post($data);
+					add_post_meta($post_id, 'aktt_tweeted', '1', true);
 				}
 			}
 		}
