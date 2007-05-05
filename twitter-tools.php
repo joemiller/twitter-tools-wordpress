@@ -167,7 +167,7 @@ class twitter_tools {
 				, 'source' => 'twittertools'
 			)
 		);
-		if ($snoop->response_code == '200') {
+		if (strpos($snoop->response_code, '200')) {
 			update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
 			return true;
 		}
@@ -351,7 +351,7 @@ function aktt_update_tweets() {
 	$snoop->pass = $aktt->twitter_password;
 	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
 
-	if ($snoop->status != '200') {
+	if (!strpos($snoop->response_code, '200')) {
 		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
@@ -710,8 +710,12 @@ function akttReset() {
 				if (!empty($_POST['aktt_tweet_text'])) {
 					$tweet = new aktt_tweet();
 					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
-					$aktt->do_tweet($tweet);
-					header('Location: '.get_bloginfo('wpurl').'/wp-admin/post-new.php?page=twitter-tools.php&tweet-posted=true');
+					if ($aktt->do_tweet($tweet)) {
+						header('Location: '.get_bloginfo('wpurl').'/wp-admin/post-new.php?page=twitter-tools.php&tweet-posted=true');
+					}
+					else {
+						wp_die(__('Oops, your tweet was not posted. Please check your username and password and that Twitter is up and running happily.', 'twitter-tools'));
+					}
 					die();
 				}
 				break;
