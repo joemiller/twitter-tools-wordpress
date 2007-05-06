@@ -3,9 +3,9 @@ Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, wid
 Contributors: alexkingorg
 Requires at least: 2.1
 Tested up to: 2.1.2
-Stable tag: 1.0b3
+Stable tag: 1.0
 
-Twitter Tools is a plugin that creates an integration between your WordPress blog and your Twitter account.
+Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
 
 == Details ==
 
@@ -13,7 +13,7 @@ Twitter Tools integrates with Twitter by giving you the following functionality:
 
 * Archive your Twitter tweets (downloaded every 30 minutes)
 * Create a blog post from each of your tweets
-* Create a daily archive of Twitter tweets
+* Create a daily digest post of your tweets
 * Create a tweet on Twitter whenever you post in your blog, with a link to the blog post
 * Post a tweet from your sidebar
 * Post a tweet from the WP Admin screens
@@ -46,6 +46,11 @@ If you are not using widgest, you can use a template tag to add your latest twee
 `<?php aktt_sidebar_tweets(); ?>`
 
 
+If you just want your latest tweet, use this template tag.
+
+`<?php aktt_latest_tweet(); ?>`
+
+
 == Hooks/API ==
 
 Twitter Tools contains a hook that can be used to pass along your tweet data to another service (for example, some folks have wanted to be able to update their Facebook status). To use this hook, create a plugin and add an action to:
@@ -68,6 +73,10 @@ Example psuedo-code:
 
 
 == Frequently Asked Questions ==
+
+= What happens if I have both my tweets posting to my blog as posts and my posts sent to Twitter? Will it cause the world to end in a spinning fireball of death? = 
+
+Actually, Twitter Tools has taken this into account and you can safely enable both creating posts from your tweets and tweets from your posts without duplicating them in either place.
 
 = Anything else? =
 

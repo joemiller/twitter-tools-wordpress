@@ -2,7 +2,7 @@
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
-Description: Bring your <a href="http://twitter.com">Twitter</a> tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
+Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
 Version: 1.0
 Author: Alex King
 Author URI: http://alexking.org
@@ -451,6 +451,26 @@ function aktt_sidebar_tweets() {
 		$output .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 	}
 	$output .= '</div>';
+	print($output);
+}
+
+function aktt_latest_tweet() {
+	global $wpdb, $aktt;
+	$tweets = $wpdb->get_results("
+		SELECT *
+		FROM $wpdb->aktt
+		GROUP BY tw_id
+		ORDER BY tw_created_at DESC
+		LIMIT 1
+	");
+	if (count($tweets) == 1) {
+		foreach ($tweets as $tweet) {
+			$output = make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a>';
+		}
+	}
+	else {
+		$output = __('No tweets available at the moment.', 'twitter-tools');
+	}
 	print($output);
 }
 
