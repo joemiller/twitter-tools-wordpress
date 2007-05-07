@@ -11,7 +11,7 @@ Twitter Tools is a plugin that creates a complete integration between your WordP
 
 Twitter Tools integrates with Twitter by giving you the following functionality:
 
-* Archive your Twitter tweets (downloaded every 30 minutes)
+* Archive your Twitter tweets (downloaded every 15 minutes)
 * Create a blog post from each of your tweets
 * Create a daily digest post of your tweets
 * Create a tweet on Twitter whenever you post in your blog, with a link to the blog post
