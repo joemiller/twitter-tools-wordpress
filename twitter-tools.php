@@ -24,9 +24,6 @@ Author URI: http://alexking.org
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 // **********************************************************************
 
-// ini_set('display_errors', '1');
-// ini_set('error_reporting', E_ALL);
-
 load_plugin_textdomain('twitter-tools');
 
 if (!function_exists('is_admin_page')) {
@@ -480,7 +477,12 @@ function aktt_make_clickable($tweet) {
 		$username = substr($tweet, 1, $space - 1);
 		$tweet = '<a href="http://twitter.com/'.$username.'">@'.$username.'</a>'.substr($tweet, $space);
 	}
-	return make_clickable($tweet);
+	if (function_exists('make_chunky')) {
+		return make_chunky($tweet);
+	}
+	else {
+		return make_clickable($tweet);
+	}
 }
 
 function aktt_tweet_form($type = 'input', $extra = '') {
