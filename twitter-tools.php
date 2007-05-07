@@ -359,7 +359,7 @@ function aktt_update_tweets() {
 	global $wpdb, $aktt;
 	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
 		update_option('aktt_doing_tweet_download', '0');
-		die('You must enter your Twitter username and password for Twitter Tools to download your tweets.');
+		die();
 	}
 	require_once(ABSPATH.WPINC.'/class-snoopy.php');
 	$snoop = new Snoopy;
@@ -435,7 +435,7 @@ function aktt_sidebar_tweets() {
 		.'	<ul>'."\n";
 	if (count($tweets) > 0) {
 		foreach ($tweets as $tweet) {
-			$output .= '		<li>'.make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
+			$output .= '		<li>'.aktt_make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
 		}
 	}
 	else {
@@ -465,13 +465,22 @@ function aktt_latest_tweet() {
 	");
 	if (count($tweets) == 1) {
 		foreach ($tweets as $tweet) {
-			$output = make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a>';
+			$output = aktt_make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a>';
 		}
 	}
 	else {
 		$output = __('No tweets available at the moment.', 'twitter-tools');
 	}
 	print($output);
+}
+
+function aktt_make_clickable($tweet) {
+	if (substr($tweet, 0, 1) == '@' && substr($tweet, 1, 1) != ' ') {
+		$space = strpos($tweet, ' ');
+		$username = substr($tweet, 1, $space - 1);
+		$tweet = '<a href="http://twitter.com/'.$username.'">@'.$username.'</a>'.substr($tweet, $space);
+	}
+	return make_clickable($tweet);
 }
 
 function aktt_tweet_form($type = 'input', $extra = '') {
@@ -598,13 +607,15 @@ function aktt_init() {
 	if (($aktt->last_tweet_download + $aktt->tweet_download_interval()) < time()) {
 		add_action('shutdown', 'aktt_update_tweets');
 	}
+	if (is_admin() || $aktt->tweet_from_sidebar) {
+		wp_enqueue_script('prototype');
+	}
 }
 add_action('init', 'aktt_init');
 
 function aktt_head() {
 	global $aktt;
 	if ($aktt->tweet_from_sidebar) {
-		wp_enqueue_script('prototype');
 		print('
 			<link rel="stylesheet" type="text/css" href="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_css" />
 			<script type="text/javascript" src="'.get_bloginfo('wpurl').'/index.php?ak_action=aktt_js"></script>
