@@ -785,7 +785,7 @@ function akttTestLoginResult() {
 				die();
 				break;
 			case 'aktt_post_tweet_sidebar':
-				if (!empty($_POST['aktt_tweet_text'])) {
+				if (!empty($_POST['aktt_tweet_text']) && current_user_can('publish_posts')) {
 					$tweet = new aktt_tweet();
 					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
 					if ($aktt->do_tweet($tweet)) {
@@ -797,7 +797,7 @@ function akttTestLoginResult() {
 				}
 				break;
 			case 'aktt_post_tweet_admin':
-				if (!empty($_POST['aktt_tweet_text'])) {
+				if (!empty($_POST['aktt_tweet_text']) && current_user_can('publish_posts')) {
 					$tweet = new aktt_tweet();
 					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
 					if ($aktt->do_tweet($tweet)) {
