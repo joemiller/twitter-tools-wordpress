@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.0
+Version: 1.1dev
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -48,6 +48,7 @@ class twitter_tools {
 			, 'create_blog_posts'
 			, 'create_digest'
 			, 'digest_title'
+			, 'blog_post_author'
 			, 'blog_post_category'
 			, 'notify_twitter'
 			, 'sidebar_tweet_count'
@@ -62,6 +63,7 @@ class twitter_tools {
 		$this->create_blog_posts = '0';
 		$this->create_digest = '0';
 		$this->digest_title = __("Twitter Updates for %s", 'twitter-tools');
+		$this->blog_post_author = '1';
 		$this->blog_post_category = '1';
 		$this->notify_twitter = '0';
 		$this->sidebar_tweet_count = '3';
@@ -80,6 +82,16 @@ class twitter_tools {
 
 	function install() {
 		global $wpdb;
+
+		$charset_collate = '';
+		if ( version_compare(mysql_get_server_info(), '4.1.0', '>=') ) {
+			if (!empty($wpdb->charset)) {
+				$charset_collate .= " DEFAULT CHARACTER SET $wpdb->charset";
+			}
+			if (!empty($wpdb->collate)) {
+				$charset_collate .= " COLLATE $wpdb->collate";
+			}
+		}
 		$result = $wpdb->query("
 			CREATE TABLE `$wpdb->aktt` (
 			`id` INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
@@ -88,7 +100,7 @@ class twitter_tools {
 			`tw_created_at` DATETIME NOT NULL ,
 			`modified` DATETIME NOT NULL ,
 			INDEX ( `tw_id` )
-			)
+			) $charset_collate
 		");
 		foreach ($this->options as $option) {
 			add_option('aktt_'.$option, $this->$option);
@@ -194,6 +206,7 @@ class twitter_tools {
 			, 'post_date' => get_date_from_gmt(date('Y-m-d H:i:s', $tweet->tw_created_at))
 			, 'post_category' => array($this->blog_post_category)
 			, 'post_status' => 'publish'
+			, 'post_author' => $wpdb->escape($this->blog_post_author)
 		);
 		$post_id = wp_insert_post($data);
 		add_post_meta($post_id, 'aktt_twitter_id', $tweet->tw_id, true);
@@ -253,6 +266,7 @@ class twitter_tools {
 						, 'post_date' => date('Y-m-d 23:59:59', $digest_day)
 						, 'post_category' => array($this->blog_post_category)
 						, 'post_status' => 'publish'
+						, 'post_author' => $wpdb->escape($this->blog_post_author)
 					);
 					$post_id = wp_insert_post($data);
 					add_post_meta($post_id, 'aktt_tweeted', '1', true);
@@ -338,7 +352,6 @@ function aktt_login_test($username, $password) {
 	$snoop->user = $username;
 	$snoop->pass = $password;
 	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
-
 	if (strpos($snoop->response_code, '200')) {
 		return true;
 	}
@@ -852,19 +865,41 @@ function aktt_admin_tweet_form() {
 function aktt_options_form() {
 	global $wpdb, $aktt;
 	$categories = $wpdb->get_results("
-		SELECT * 
-		FROM $wpdb->categories 
-		ORDER BY cat_name
+		SELECT $wpdb->terms.* 
+		FROM $wpdb->terms 
+		LEFT JOIN $wpdb->term_taxonomy
+		ON $wpdb->term_taxonomy.term_id = $wpdb->terms.term_id
+		WHERE $wpdb->term_taxonomy.taxonomy = 'category'
+		ORDER BY $wpdb->terms.name
 	");
 	$cat_options = '';
 	foreach ($categories as $category) {
-		if ($category->cat_ID == $aktt->blog_post_category) {
+		if ($category->term_id == $aktt->blog_post_category) {
 			$selected = 'selected="selected"';
 		}
 		else {
 			$selected = '';
 		}
-		$cat_options .= "\n\t<option value='$category->cat_ID' $selected>$category->cat_name</option>";
+		$cat_options .= "\n\t<option value='$category->term_id' $selected>$category->name</option>";
+	}
+	$authors = $wpdb->get_results("
+		SELECT $wpdb->users.* 
+		FROM $wpdb->users 
+		LEFT JOIN $wpdb->usermeta
+		ON $wpdb->usermeta.user_id = $wpdb->users.ID
+		WHERE $wpdb->usermeta.meta_key = 'wp_user_level'
+		AND $wpdb->usermeta.meta_value > 2
+		ORDER BY $wpdb->users.user_nicename
+	");
+	$author_options = '';
+	foreach ($authors as $author) {
+		if ($author->ID == $aktt->blog_post_author) {
+			$selected = 'selected="selected"';
+		}
+		else {
+			$selected = '';
+		}
+		$author_options .= "\n\t<option value='$author->ID' $selected>$author->user_nicename</option>";
 	}
 	$yes_no = array(
 		'create_blog_posts'
@@ -930,8 +965,12 @@ function aktt_options_form() {
 							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
 						</p>
 						<p>
-							<label for="aktt_blog_post_category">'.__('Select a category for your tweets:', 'twitter-tools').'</label>
+							<label for="aktt_blog_post_category">'.__('Select a category for your tweet posts:', 'twitter-tools').'</label>
 							<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
+						</p>
+						<p>
+							<label for="aktt_blog_post_author">'.__('Select an author for your tweet posts:', 'twitter-tools').'</label>
+							<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
 						</p>
 						<p>
 							<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
@@ -1056,7 +1095,7 @@ function aktt_relativeTime ($date, $precision=2)
 	$diff 	-= $minutes * 60;
 	$seconds = $diff;
 
-	if ($days > 30) {
+	if ($months > 0) {
 		return date('Y-m-d', $time);
 	} else {
 		$relative_date = '';
