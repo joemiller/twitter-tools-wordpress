@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.1dev
+Version: 1.1b1
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -17,6 +17,7 @@ Author URI: http://alexking.org
 // http://wordpress.org/
 //
 // Thanks to John Ford ( http://www.aldenta.com ) for his contributions.
+// Thanks to Dougal Campbell ( http://dougal.gunters.org ) for his contributions.
 //
 // **********************************************************************
 // This program is distributed in the hope that it will be useful, but
@@ -864,14 +865,8 @@ function aktt_admin_tweet_form() {
 
 function aktt_options_form() {
 	global $wpdb, $aktt;
-	$categories = $wpdb->get_results("
-		SELECT $wpdb->terms.* 
-		FROM $wpdb->terms 
-		LEFT JOIN $wpdb->term_taxonomy
-		ON $wpdb->term_taxonomy.term_id = $wpdb->terms.term_id
-		WHERE $wpdb->term_taxonomy.taxonomy = 'category'
-		ORDER BY $wpdb->terms.name
-	");
+
+	$categories = get_categories('hide_empty=0');
 	$cat_options = '';
 	foreach ($categories as $category) {
 		if ($category->term_id == $aktt->blog_post_category) {
@@ -882,17 +877,16 @@ function aktt_options_form() {
 		}
 		$cat_options .= "\n\t<option value='$category->term_id' $selected>$category->name</option>";
 	}
-	$authors = $wpdb->get_results("
-		SELECT $wpdb->users.* 
-		FROM $wpdb->users 
-		LEFT JOIN $wpdb->usermeta
-		ON $wpdb->usermeta.user_id = $wpdb->users.ID
-		WHERE $wpdb->usermeta.meta_key = 'wp_user_level'
-		AND $wpdb->usermeta.meta_value > 2
-		ORDER BY $wpdb->users.user_nicename
-	");
+
+	$authors = get_users_of_blog();
 	$author_options = '';
-	foreach ($authors as $author) {
+	foreach ($authors as $user) {
+		$usero = new WP_User($user->user_id);
+		$author = $usero->data;
+		// Only list users who are allowed to publish
+		if (! $usero->has_cap('publish_posts')) {
+			continue;
+		}
 		if ($author->ID == $aktt->blog_post_author) {
 			$selected = 'selected="selected"';
 		}
