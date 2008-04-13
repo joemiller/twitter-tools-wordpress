@@ -587,6 +587,7 @@ function aktt_latest_tweet() {
 }
 
 function aktt_tweet_display($tweet) {
+	global $aktt;
 	$output = aktt_make_clickable(wp_specialchars($tweet->tw_text));
 	if (!empty($tweet->tw_reply_username)) {
 		$output .= 	' <a href="http://twitter.com/'.$tweet->tw_reply_username.'/statuses/'.$tweet->tw_reply_tweet.'">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
