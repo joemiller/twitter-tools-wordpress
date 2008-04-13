@@ -84,6 +84,8 @@ class twitter_tools {
 			, 'doing_digest_post'
 			, 'install_date'
 			, 'js_lib'
+			, 'digest_tweet_order'
+			, 'notify_twitter_default'
 		);
 		$this->twitter_username = '';
 		$this->twitter_password = '';
@@ -94,12 +96,14 @@ class twitter_tools {
 		$this->blog_post_category = '1';
 		$this->blog_post_tags = '';
 		$this->notify_twitter = '0';
+		$this->notify_twitter_default = '0';
 		$this->sidebar_tweet_count = '3';
 		$this->tweet_from_sidebar = '1';
 		$this->give_tt_credit = '1';
 		$this->exclude_reply_tweets = '0';
 		$this->install_date = '';
 		$this->js_lib = 'jquery';
+		$this->digest_tweet_order = 'ASC';
 		// not included in options
 		$this->update_hash = '';
 		$this->tweet_prefix = 'New blog post';
@@ -221,12 +225,13 @@ class twitter_tools {
 		if ($this->notify_twitter == '0'
 			|| $post_id == 0
 			|| get_post_meta($post_id, 'aktt_tweeted', true) == '1'
+			|| get_post_meta($post_id, 'aktt_notify_twitter', true) == 'no'
 		) {
 			return;
 		}
 		$post = get_post($post_id);
 		// check for an edited post before TT was installed
-		if ($post->post_date <= get_option('aktt_install_date')) {
+		if ($post->post_date <= $this->install_date) {
 			return;
 		}
 		$tweet = new aktt_tweet;
@@ -279,7 +284,7 @@ class twitter_tools {
 				WHERE tw_created_at >= '".date('Y-m-d 00:00:00', $digest_day)."'
 				AND tw_created_at <= '".date('Y-m-d 23:59:59', $digest_day)."'
 				GROUP BY tw_id
-				ORDER BY tw_created_at
+				ORDER BY tw_created_at $this->digest_tweet_order
 			");
 			if (count($tweets) > 0) {
 				$tweets_to_post = array();
@@ -470,7 +475,7 @@ function aktt_notify_twitter($post_id) {
 	global $aktt;
 	$aktt->do_blog_post_tweet($post_id);
 }
-add_action('publish_post', 'aktt_notify_twitter');
+add_action('publish_post', 'aktt_notify_twitter', 99);
 
 function aktt_sidebar_tweets() {
 	global $wpdb, $aktt;
@@ -1038,11 +1043,25 @@ function aktt_options_form() {
 		}
 		$js_lib_options .= "\n\t<option value='$js_lib' $selected>$js_lib_display</option>";
 	}
-	
+	$digest_tweet_orders = array(
+		'ASC' => 'Oldest first (Chronological order)'
+		, 'DESC' => 'Newest first (Reverse-chronological order)'
+	);
+	$digest_tweet_order_options = '';
+	foreach ($digest_tweet_orders as $digest_tweet_order => $digest_tweet_order_display) {
+		if ($digest_tweet_order == $aktt->digest_tweet_order) {
+			$selected = 'selected="selected"';
+		}
+		else {
+			$selected = '';
+		}
+		$digest_tweet_order_options .= "\n\t<option value='$digest_tweet_order' $selected>$digest_tweet_order_display</option>";
+	}	
 	$yes_no = array(
 		'create_blog_posts'
 		, 'create_digest'
 		, 'notify_twitter'
+		, 'notify_twitter_default'
 		, 'tweet_from_sidebar'
 		, 'give_tt_credit'
 		, 'exclude_reply_tweets'
@@ -1086,9 +1105,13 @@ function aktt_options_form() {
 							<input type="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
 							<span id="aktt_login_test_result"></span>
 						</p>
-						<p>
-							<label for="aktt_notify_twitter">'.__('Create a tweet when you post in your blog?', 'twitter-tools').'</label>
+						<p style="margin-bottom: 0;">
+							<label for="aktt_notify_twitter">'.__('Enable option to create a tweet when you post in your blog?', 'twitter-tools').'</label>
 							<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
+						</p>
+						<p style="padding-left: 20px;">
+							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
+							<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select>
 						</p>
 						<p>
 							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
@@ -1102,6 +1125,10 @@ function aktt_options_form() {
 							<label for="aktt_digest_title">'.__('Title for digest posts:', 'twitter-tools').'</label>
 							<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
 							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+						</p>
+						<p>
+							<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
+							<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
 						</p>
 						<p>
 							<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
@@ -1157,6 +1184,44 @@ function aktt_options_form() {
 			</div>
 	');
 }
+
+function aktt_post_options() {
+	global $aktt, $post;
+	if ($aktt->notify_twitter) {
+		if (get_post_meta($post->ID, 'aktt_notify_twitter', true) == 'no' || !$aktt->notify_twitter_default) {
+			$checked = '';
+		}
+		else {
+			$checked = 'checked="checked"';
+		}
+		print('
+<p>
+	<input type="checkbox" name="aktt_notify_twitter" id="aktt_notify_twitter" value="yes" '.$checked.' />
+	<label for="aktt_notify_twitter">Notify Twitter about this post?</label>
+</p>
+		');
+	}
+}
+add_action('edit_form_advanced', 'aktt_post_options');
+
+function aktt_store_post_options($post_id) {
+	if (!empty($_POST['aktt_notify_twitter'])) {
+		$notify = 'yes';
+	}
+	else {
+		$notify = 'no';
+	}
+	if (get_post_meta($post_id, 'aktt_notify_twitter', true)) {
+		update_post_meta($post_id, 'aktt_notify_twitter', $notify);
+	}
+	else {
+		add_post_meta($post_id, 'aktt_notify_twitter', $notify);
+	}
+
+}
+add_action('draft_post', 'aktt_store_post_options', 1);
+add_action('publish_post', 'aktt_store_post_options', 1);
+add_action('save_post', 'aktt_store_post_options', 1);
 
 function aktt_menu_items() {
 	if (current_user_can('manage_options')) {
