@@ -112,7 +112,7 @@ class twitter_tools {
 		$this->last_tweet_download = '';
 		$this->doing_tweet_download = '0';
 		$this->doing_digest_post = '0';
-		$this->version = '1.1';
+		$this->version = '1.2b1';
 	}
 
 	function install() {
@@ -603,10 +603,6 @@ function aktt_make_clickable($tweet) {
 	else {
 		return make_clickable($tweet);
 	}
-}
-
-function aktt_is_reply($tweet) {
-	return false;
 }
 
 function aktt_tweet_form($type = 'input', $extra = '') {
