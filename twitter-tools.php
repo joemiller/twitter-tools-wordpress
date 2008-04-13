@@ -132,6 +132,8 @@ class twitter_tools {
 			`id` INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
 			`tw_id` VARCHAR( 255 ) NOT NULL ,
 			`tw_text` VARCHAR( 255 ) NOT NULL ,
+			`tw_reply_username` VARCHAR( 255 ) DEFAULT NULL ,
+			`tw_reply_tweet` VARCHAR( 255 ) DEFAULT NULL ,
 			`tw_created_at` DATETIME NOT NULL ,
 			`modified` DATETIME NOT NULL ,
 			INDEX ( `tw_id` )
@@ -141,6 +143,32 @@ class twitter_tools {
 			add_option('aktt_'.$option, $this->$option);
 		}
 		add_option('aktt_update_hash', '');
+	}
+	
+	function upgrade() {
+		global $wpdb;
+		$col_data = $wpdb->get_results("
+			SHOW COLUMNS FROM $wpdb->aktt
+		");
+		$cols = array();
+		foreach ($col_data as $col) {
+			$cols[] = $col->Field;
+		}
+		// 1.2 schema upgrade
+		if (!in_array('tw_reply_username', $cols)) {
+			$wpdb->query("
+				ALTER TABLE `$wpdb->aktt`
+				ADD `tw_reply_username` VARCHAR( 255 ) DEFAULT NULL
+				AFTER `tw_text`
+			");
+		}
+		if (!in_array('tw_reply_tweet', $cols)) {
+			$wpdb->query("
+				ALTER TABLE `$wpdb->aktt`
+				ADD `tw_reply_tweet` VARCHAR( 255 ) DEFAULT NULL
+				AFTER `tw_reply_username`
+			");
+		}
 	}
 
 	function get_settings() {
@@ -164,6 +192,7 @@ class twitter_tools {
 			if (empty($this->install_date)) {
 				update_option('aktt_install_date', current_time('mysql'));
 			}
+			$this->upgrade();
 		}
 	}
 
@@ -330,11 +359,15 @@ class aktt_tweet {
 		$tw_id = ''
 		, $tw_text = ''
 		, $tw_created_at = ''
+		, $tw_reply_username = null
+		, $tw_reply_tweet = null
 	) {
 		$this->id = '';
 		$this->modified = '';
 		$this->tw_created_at = $tw_created_at;
 		$this->tw_text = $tw_text;
+		$this->tw_reply_username = $tw_reply_username;
+		$this->tw_reply_tweet = $tw_reply_tweet;
 		$this->tw_id = $tw_id;
 	}
 	
@@ -373,12 +406,16 @@ class aktt_tweet {
 			INTO $wpdb->aktt
 			( tw_id
 			, tw_text
+			, tw_reply_username
+			, tw_reply_tweet
 			, tw_created_at
 			, modified
 			)
 			VALUES
 			( '".$wpdb->escape($this->tw_id)."'
 			, '".$wpdb->escape($this->tw_text)."'
+			, '".$wpdb->escape($this->tw_reply_username)."'
+			, '".$wpdb->escape($this->tw_reply_tweet)."'
 			, '".date('Y-m-d H:i:s', $this->tw_created_at)."'
 			, NOW()
 			)
@@ -455,20 +492,31 @@ function aktt_update_tweets() {
 					$tw_data->id
 					, $tw_data->text
 				);
+				if (!empty($tw_data->in_reply_to_user_id)) {
+					$tweet->tw_reply_username = $tw_data->in_reply_to->user->screen_name;
+					$tweet->tw_reply_tweet = $tw_data->in_reply_to->id;
+				}
+				// make sure we haven't downloaded someone else's tweets - happens sometimes due to Twitter hiccups
 				$tweet->tw_created_at = $tweet->twdate_to_time($tw_data->created_at);
-				$new_tweets[] = $tweet;
+				if ($tw_data->user->screen_name == $aktt->twitter_username) {
+					$new_tweets[] = $tweet;
+				}
 			}
 		}
 		foreach ($new_tweets as $tweet) {
 			$tweet->add();
 		}
 	}
-	update_option('aktt_update_hash', $hash);
-	update_option('aktt_last_tweet_download', time());
-	update_option('aktt_doing_tweet_download', '0');
+	aktt_reset_tweet_checking($hash, time());
 	if ($aktt->create_digest == '1' && strtotime(get_option('aktt_last_digest_post')) < strtotime(date('Y-m-d 00:00:00', ak_gmmktime()))) {
 		$aktt->do_digest_post();
 	}
+}
+
+function aktt_reset_tweet_checking($hash = '', $time = 0) {
+	update_option('aktt_update_hash', $hash);
+	update_option('aktt_last_tweet_download', $time);
+	update_option('aktt_doing_tweet_download', '0');
 }
 
 function aktt_notify_twitter($post_id) {
@@ -497,7 +545,7 @@ function aktt_sidebar_tweets() {
 		.'	<ul>'."\n";
 	if (count($tweets) > 0) {
 		foreach ($tweets as $tweet) {
-			$output .= '		<li>'.aktt_make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a></li>'."\n";
+			$output .= '		<li>'.aktt_tweet_display($tweet).'</li>'."\n";
 		}
 	}
 	else {
@@ -529,13 +577,22 @@ function aktt_latest_tweet() {
 	");
 	if (count($tweets) == 1) {
 		foreach ($tweets as $tweet) {
-			$output = aktt_make_clickable(wp_specialchars($tweet->tw_text)).' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a>';
+			$output = aktt_tweet_display($tweet);
 		}
 	}
 	else {
 		$output = __('No tweets available at the moment.', 'twitter-tools');
 	}
 	print($output);
+}
+
+function aktt_tweet_display($tweet) {
+	$output = aktt_make_clickable(wp_specialchars($tweet->tw_text));
+	if (!empty($tweet->tw_reply_username)) {
+		$output .= 	' <a href="http://twitter.com/'.$tweet->tw_reply_username.'/statuses/'.$tweet->tw_reply_tweet.'">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
+	}
+	$output .= ' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a>';
+	return $output;
 }
 
 function aktt_make_clickable($tweet) {
@@ -719,6 +776,11 @@ function aktt_request_handler() {
 			case 'aktt_update_tweets':
 				aktt_update_tweets();
 				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&tweets-updated=true');
+				die();
+				break;
+			case 'aktt_reset_tweet_checking':
+				aktt_reset_tweet_checking();
+				header('Location: '.get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&tweet-checking-reset=true');
 				die();
 				break;
 			case 'aktt_js':
@@ -1088,6 +1150,13 @@ function aktt_options_form() {
 			</div>
 		');
 	}
+	if ( $_GET['tweet-checking-reset'] ) {
+		print('
+			<div id="message" class="updated fade">
+				<p>'.__('Tweet checking has been reset.', 'twitter-tools').'</p>
+			</div>
+		');
+	}
 	print('
 			<div class="wrap">
 				<h2>'.__('Twitter Tools Options', 'twitter-tools').'</h2>
@@ -1174,8 +1243,9 @@ function aktt_options_form() {
 				<form name="ak_twittertools_updatetweets" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="get">
 					<p>'.__('Use this button to manually update your tweets.', 'twitter-tools').'</p>
 					<p class="submit">
-						<input type="submit" name="submit" value="'.__('Update Tweets', 'twitter-tools').'" />
-						<input type="hidden" name="ak_action" value="aktt_update_tweets" />
+						<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
+						<input type="submit" name="reset-button" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
+						<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
 					</p>
 				</form>
 				<h2>'.__('README', 'twitter-tools').'</h2>
