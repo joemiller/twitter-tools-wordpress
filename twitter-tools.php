@@ -320,7 +320,7 @@ class twitter_tools {
 				foreach ($tweets as $data) {
 					$tweet = new aktt_tweet;
 					$tweet->tw_text = $data->tw_text;
-					if (!$tweet->tweet_is_post_notification()) {
+					if (!$tweet->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || empty($this->tw_reply_username)) {
 						$tweets_to_post[] = $data;
 					}
 				}
@@ -421,7 +421,7 @@ class aktt_tweet {
 			)
 		");
 		do_action('aktt_add_tweet', $this);
-		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification()) {
+		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || empty($this->tw_reply_username))) {
 			$aktt->do_tweet_post($this);
 		}
 	}
@@ -1210,7 +1210,7 @@ function aktt_options_form() {
 							<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
 						</p>
 						<p>
-							<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar?', 'twitter-tools').'</label>
+							<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your blog?', 'twitter-tools').'</label>
 							<select name="aktt_exclude_reply_tweets" id="aktt_exclude_reply_tweets">'.$exclude_reply_tweets_options.'</select>
 						</p>
 						<p>
