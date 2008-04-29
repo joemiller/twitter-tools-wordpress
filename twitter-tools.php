@@ -320,7 +320,7 @@ class twitter_tools {
 				foreach ($tweets as $data) {
 					$tweet = new aktt_tweet;
 					$tweet->tw_text = $data->tw_text;
-					if (!$tweet->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || empty($this->tw_reply_username)) {
+					if (!$tweet->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || empty($this->tw_reply_username))) {
 						$tweets_to_post[] = $data;
 					}
 				}
