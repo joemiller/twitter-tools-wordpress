@@ -388,7 +388,8 @@ class twitter_tools {
 				foreach ($tweets as $data) {
 					$tweet = new aktt_tweet;
 					$tweet->tw_text = $data->tw_text;
-					if (!$tweet->tweet_is_post_notification()) {
+					$tweet->tw_reply_tweet = $data->tw_reply_tweet;
+					if (!$tweet->tweet_is_post_notification() || ($tweet->tweet_is_reply() && $this->exclude_reply_tweets)) {
 						$tweets_to_post[] = $data;
 					}
 				}
@@ -396,7 +397,7 @@ class twitter_tools {
 				if (count($tweets_to_post) > 0) {
 					$content = '<ul class="aktt_tweet_digest">'."\n";
 					foreach ($tweets_to_post as $tweet) {
-						$content .= '	<li>'.aktt_make_clickable($tweet->tw_text).' <a href="http://twitter.com/'.$this->twitter_username.'/statuses/'.$tweet->tw_id.'">#</a></li>'."\n";
+						$content .= '	<li>'.aktt_tweet_display($tweet, 'absolute').'</li>'."\n";
 					}
 					$content .= '</ul>'."\n";
 					if ($this->give_tt_credit == '1') {
@@ -550,6 +551,10 @@ class aktt_tweet {
 		return false;
 	}
 	
+	function tweet_is_reply() {
+		return !empty($this->tw_reply_tweet);
+	}
+	
 	function add() {
 		global $wpdb, $aktt;
 		$wpdb->query("
@@ -572,7 +577,7 @@ class aktt_tweet {
 			)
 		");
 		do_action('aktt_add_tweet', $this);
-		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || empty($this->tw_reply_username))) {
+		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || $this->tweet_is_reply())) {
 			$aktt->do_tweet_post($this);
 		}
 	}
@@ -747,13 +752,21 @@ function aktt_latest_tweet() {
 	print($output);
 }
 
-function aktt_tweet_display($tweet) {
+function aktt_tweet_display($tweet, $time = 'relative') {
 	global $aktt;
 	$output = aktt_make_clickable(wp_specialchars($tweet->tw_text));
 	if (!empty($tweet->tw_reply_username)) {
 		$output .= 	' <a href="http://twitter.com/'.$tweet->tw_reply_username.'/statuses/'.$tweet->tw_reply_tweet.'">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
 	}
-	$output .= ' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.aktt_relativeTime($tweet->tw_created_at, 3).'</a>';
+	switch ($time) {
+		case 'relative':
+			$time_display = aktt_relativeTime($tweet->tw_created_at, 3);
+			break;
+		case 'absolute':
+			$time_display = '#';
+			break;
+	}
+	$output .= ' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.$time_display.'</a>';
 	return $output;
 }
 
@@ -1563,7 +1576,7 @@ function aktt_options_form() {
 							<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
 						</div>
 						<div class="option">
-							<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar?', 'twitter-tools').'</label>
+							<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar, digests and created blog posts?', 'twitter-tools').'</label>
 							<select name="aktt_exclude_reply_tweets" id="aktt_exclude_reply_tweets">'.$exclude_reply_tweets_options.'</select>
 						</div>
 						<div class="option">
