@@ -655,6 +655,7 @@ function aktt_update_tweets() {
 					$tw_data->id
 					, $tw_data->text
 				);
+				$tweet->tw_created_at = $tweet->twdate_to_time($tw_data->created_at);
 				if (!empty($tw_data->in_reply_to_status_id)) {
 					$tweet->tw_reply_tweet = $tw_data->in_reply_to_status_id;
 					$snoop->fetch('http://twitter.com/statuses/show/'.$tw_data->in_reply_to_status_id.'.json');
@@ -665,7 +666,6 @@ function aktt_update_tweets() {
 					}
 				}
 				// make sure we haven't downloaded someone else's tweets - happens sometimes due to Twitter hiccups
-				$tweet->tw_created_at = $tweet->twdate_to_time($tw_data->created_at);
 				if ($tw_data->user->screen_name == $aktt->twitter_username) {
 					$new_tweets[] = $tweet;
 				}
