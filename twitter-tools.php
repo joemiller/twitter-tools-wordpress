@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.5b1
+Version: 1.5b2
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -356,7 +356,7 @@ class twitter_tools {
 		update_option('aktt_doing_digest_post', '1');
 		remove_action('publish_post', 'aktt_notify_twitter');
 
-		try {
+//		try {
 		
 			// see if there's any tweets in the time range
 			global $wpdb;
@@ -425,9 +425,9 @@ class twitter_tools {
 			// indicate everything is swell
 			$success = true;
 			
-		} catch (Exception $e) {
+//		} catch (Exception $e) {
 			// dbg('oops', $e->getMessage());
-		}
+//		}
 		
 		add_action('publish_post', 'aktt_notify_twitter');
 		update_option('aktt_doing_digest_post', '0');
