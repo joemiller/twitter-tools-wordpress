@@ -368,6 +368,7 @@ class twitter_tools {
 			$conditions = array();
 			$conditions[] = "tw_created_at >= '{$startGMT}'";
 			$conditions[] = "tw_created_at <= '{$endGMT}'";
+			$conditions[] = "tw_text NOT LIKE '$this->tweet_prefix%'";
 			if ($this->exclude_reply_tweets) {
 				$conditions[] = "tw_text NOT LIKE '@%'";
 			}
@@ -480,6 +481,10 @@ class twitter_tools {
 		$post = get_post($post_id);
 		// check for an edited post before TT was installed
 		if ($post->post_date <= $this->install_date) {
+			return;
+		}
+		// check for private posts
+		if ($post->post_status != 'publish') {
 			return;
 		}
 		$tweet = new aktt_tweet;
@@ -694,7 +699,7 @@ add_action('publish_post', 'aktt_notify_twitter', 99);
 function aktt_sidebar_tweets() {
 	global $wpdb, $aktt;
 	if ($aktt->exclude_reply_tweets) {
-		$where = "WHERE tw_text NOT LIKE '@%'";
+		$where = "AND tw_text NOT LIKE '@%' ";
 	}
 	else {
 		$where = '';
@@ -702,6 +707,7 @@ function aktt_sidebar_tweets() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
+		WHERE tw_text NOT LIKE '$aktt->tweet_prefix%'
 		$where
 		GROUP BY tw_id
 		ORDER BY tw_created_at DESC
@@ -737,6 +743,7 @@ function aktt_latest_tweet() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
+		WHERE tw_text NOT LIKE '$aktt->tweet_prefix%'
 		GROUP BY tw_id
 		ORDER BY tw_created_at DESC
 		LIMIT 1
