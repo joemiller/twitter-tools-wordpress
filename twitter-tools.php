@@ -582,7 +582,7 @@ class aktt_tweet {
 			)
 		");
 		do_action('aktt_add_tweet', $this);
-		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || $this->tweet_is_reply())) {
+		if ($aktt->create_blog_posts == '1' && !$this->tweet_post_exists() && !$this->tweet_is_post_notification() && (!$aktt->exclude_reply_tweets || !$this->tweet_is_reply())) {
 			$aktt->do_tweet_post($this);
 		}
 	}
