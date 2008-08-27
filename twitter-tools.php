@@ -69,6 +69,13 @@ if (!function_exists('wp_prototype_before_jquery')) {
 	add_filter( 'print_scripts_array', 'wp_prototype_before_jquery' );
 }
 
+define('AKTT_API_POST_STATUS', 'http://twitter.com/statuses/update.json');
+define('AKTT_API_USER_TIMELINE', 'http://twitter.com/statuses/user_timeline.json');
+define('AKTT_API_STATUS_SHOW', 'http://twitter.com/statuses/show/###ID###.json');
+define('AKTT_PROFILE_URL', 'http://twitter.com/###USERNAME###');
+define('AKTT_STATUS_URL', 'http://twitter.com/###USERNAME###/statuses/###STATUS###');
+define('AKTT_HASHTAG_URL', 'http://search.twitter.com/search?q=###HASHTAG###');
+
 class twitter_tools {
 	function twitter_tools() {
 		$this->options = array(
@@ -457,7 +464,7 @@ class twitter_tools {
 		$snoop->user = $this->twitter_username;
 		$snoop->pass = $this->twitter_password;
 		$snoop->submit(
-			'http://twitter.com/statuses/update.json'
+			AKTT_API_POST_STATUS
 			, array(
 				'status' => $tweet->tw_text
 				, 'source' => 'twittertools'
@@ -588,13 +595,48 @@ class aktt_tweet {
 	}
 }
 
+function aktt_api_status_show_url($id) {
+	return str_replace('###ID###', $id, AKTT_API_STATUS_SHOW);
+}
+
+function aktt_profile_url($username) {
+	return str_replace('###USERNAME###', $username, AKTT_PROFILE_URL);
+}
+
+function aktt_profile_link($username, $prefix = '', $suffix = '') {
+	return $prefix.'<a href="'.aktt_profile_url($username).'">'.$username.'</a>'.$suffix;
+}
+
+function aktt_hashtag_url($hashtag) {
+	$hashtag = urlencode('#'.$hashtag);
+	return str_replace('###HASHTAG###', $hashtag, AKTT_HASHTAG_URL);
+}
+
+function aktt_hashtag_link($hashtag, $prefix = '', $suffix = '') {
+	return $prefix.'<a href="'.aktt_hashtag_url($hashtag).'">'.htmlspecialchars($hashtag).'</a>'.$suffix;
+}
+
+function aktt_status_url($username, $status) {
+	return str_replace(
+		array(
+			'###USERNAME###'
+			, '###STATUS###'
+		)
+		, array(
+			$username
+			, $status
+		)
+		, AKTT_STATUS_URL
+	);
+}
+
 function aktt_login_test($username, $password) {
 	require_once(ABSPATH.WPINC.'/class-snoopy.php');
 	$snoop = new Snoopy;
 	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
 	$snoop->user = $username;
 	$snoop->pass = $password;
-	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
+	$snoop->fetch(AKTT_API_USER_TIMELINE);
 	if (strpos($snoop->response_code, '200')) {
 		return __("Login succeeded, you're good to go.", 'twitter-tools');
 	} else {
@@ -626,7 +668,7 @@ function aktt_update_tweets() {
 	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
 	$snoop->user = $aktt->twitter_username;
 	$snoop->pass = $aktt->twitter_password;
-	$snoop->fetch('http://twitter.com/statuses/user_timeline.json');
+	$snoop->fetch(AKTT_API_USER_TIMELINE);
 
 	if (!strpos($snoop->response_code, '200')) {
 		update_option('aktt_doing_tweet_download', '0');
@@ -663,7 +705,8 @@ function aktt_update_tweets() {
 				$tweet->tw_created_at = $tweet->twdate_to_time($tw_data->created_at);
 				if (!empty($tw_data->in_reply_to_status_id)) {
 					$tweet->tw_reply_tweet = $tw_data->in_reply_to_status_id;
-					$snoop->fetch('http://twitter.com/statuses/show/'.$tw_data->in_reply_to_status_id.'.json');
+					$url = aktt_api_status_show_url($tw_data->in_reply_to_status_id);
+					$snoop->fetch($url);
 					if (strpos($snoop->response_code, '200') !== false) {
 						$data = $snoop->results;
 						$status = $json->decode($data);
@@ -724,7 +767,7 @@ function aktt_sidebar_tweets() {
 		$output .= '		<li>'.__('No tweets available at the moment.', 'twitter-tools').'</li>'."\n";
 	}
 	if (!empty($aktt->twitter_username)) {
-  		$output .= '		<li class="aktt_more_updates"><a href="http://twitter.com/'.$aktt->twitter_username.'">More updates...</a></li>'."\n";
+  		$output .= '		<li class="aktt_more_updates"><a href="'.aktt_profile_url($aktt->twitter_username).'">More updates...</a></li>'."\n";
 	}
 	$output .= '</ul>';
 	if ($aktt->tweet_from_sidebar == '1' && !empty($aktt->twitter_username) && !empty($aktt->twitter_password)) {
@@ -763,7 +806,7 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 	global $aktt;
 	$output = aktt_make_clickable(wp_specialchars($tweet->tw_text));
 	if (!empty($tweet->tw_reply_username)) {
-		$output .= 	' <a href="http://twitter.com/'.$tweet->tw_reply_username.'/statuses/'.$tweet->tw_reply_tweet.'">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
+		$output .= 	' <a href="'.aktt_status_url($tweet->tw_reply_username, $tweet->tw_reply_tweet).'">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
 	}
 	switch ($time) {
 		case 'relative':
@@ -773,12 +816,30 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 			$time_display = '#';
 			break;
 	}
-	$output .= ' <a href="http://twitter.com/'.$aktt->twitter_username.'/statuses/'.$tweet->tw_id.'">'.$time_display.'</a>';
+	$output .= ' <a href="'.aktt_status_url($aktt->twitter_username, $tweet->tw_id).'">'.$time_display.'</a>';
 	return $output;
 }
 
 function aktt_make_clickable($tweet) {
-	$tweet = preg_replace('/\@([a-zA-Z0-9_]{1,15}) /','@<a href="http://twitter.com/\\1">\\1</a> ', $tweet);
+//	$tweet = preg_replace('/\@([a-zA-Z0-9_]{1,15}) /','@<a href="http://twitter.com/\\1">\\1</a> ', $tweet);
+	$tweet .= ' ';
+	$tweet = preg_replace_callback(
+		'/\@([a-zA-Z0-9_]{1,15}) /'
+		, create_function(
+			'$matches'
+			, 'return aktt_profile_link($matches[1], \'@\', \' \');'
+		)
+		, $tweet
+	);
+	$tweet = preg_replace_callback(
+		'/\#([a-zA-Z0-9_]{1,15}) /'
+		, create_function(
+			'$matches'
+			, 'return aktt_hashtag_link($matches[1], \'#\', \' \');'
+		)
+		, $tweet
+	);
+	
 	if (function_exists('make_chunky')) {
 		return make_chunky($tweet);
 	}
@@ -1675,8 +1736,8 @@ function aktt_menu_items() {
 	if (current_user_can('publish_posts')) {
 		add_submenu_page(
 			'post-new.php'
-			, __('Write Tweet', 'twitter-tools')
-			, __('Write Tweet', 'twitter-tools')
+			, __('New Tweet', 'twitter-tools')
+			, __('Tweet', 'twitter-tools')
 			, 10
 			, basename(__FILE__)
 			, 'aktt_admin_tweet_form'
