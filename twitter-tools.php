@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
-Version: 1.5b2
+Version: 1.5b3dev
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -1704,24 +1704,23 @@ function aktt_post_options() {
 }
 add_action('edit_form_advanced', 'aktt_post_options');
 
-function aktt_store_post_options($post_id) {
+function aktt_store_post_options($post_id, $post) {
 	if (!empty($_POST['aktt_notify_twitter'])) {
 		$notify = 'yes';
 	}
 	else {
 		$notify = 'no';
 	}
-	if (get_post_meta($post_id, 'aktt_notify_twitter', true)) {
-		update_post_meta($post_id, 'aktt_notify_twitter', $notify);
+	if ($post->post_type == 'revision' && $post->post_parent != $post_id) {
+		$post_id = $post->post_parent;
 	}
-	else {
+	if (!update_post_meta($post_id, 'aktt_notify_twitter', $notify)) {
 		add_post_meta($post_id, 'aktt_notify_twitter', $notify);
 	}
-
 }
-add_action('draft_post', 'aktt_store_post_options', 1);
-add_action('publish_post', 'aktt_store_post_options', 1);
-add_action('save_post', 'aktt_store_post_options', 1);
+add_action('draft_post', 'aktt_store_post_options', 1, 2);
+add_action('publish_post', 'aktt_store_post_options', 1, 2);
+add_action('save_post', 'aktt_store_post_options', 1, 2);
 
 function aktt_menu_items() {
 	if (current_user_can('manage_options')) {
