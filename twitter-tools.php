@@ -1705,14 +1705,14 @@ function aktt_post_options() {
 add_action('edit_form_advanced', 'aktt_post_options');
 
 function aktt_store_post_options($post_id, $post) {
+	if ($post->post_type == 'revision') {
+		return;
+	}
 	if (!empty($_POST['aktt_notify_twitter'])) {
 		$notify = 'yes';
 	}
 	else {
 		$notify = 'no';
-	}
-	if ($post->post_type == 'revision' && $post->post_parent != $post_id) {
-		$post_id = $post->post_parent;
 	}
 	if (!update_post_meta($post_id, 'aktt_notify_twitter', $notify)) {
 		add_post_meta($post_id, 'aktt_notify_twitter', $notify);
