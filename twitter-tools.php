@@ -658,7 +658,7 @@ function aktt_update_tweets() {
 		return;
 	}
 	// wait 10 min between downloads
-	if (time() - intval(get_option('last_tweet_download')) < 600) {
+	if (time() - intval(get_option('aktt_last_tweet_download')) < 600) {
 		return;
 	}
 	update_option('aktt_doing_tweet_download', time());
@@ -683,12 +683,13 @@ function aktt_update_tweets() {
 
 	$hash = md5($data);
 	if ($hash == get_option('aktt_update_hash')) {
-		update_option('last_tweet_download', time());
+		update_option('aktt_last_tweet_download', time());
 		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
 	$json = new Services_JSON();
 	$tweets = $json->decode($data);
+
 	if (is_array($tweets) && count($tweets) > 0) {
 		$tweet_ids = array();
 		foreach ($tweets as $tweet) {
