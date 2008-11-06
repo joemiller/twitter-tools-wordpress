@@ -657,11 +657,15 @@ function aktt_update_tweets() {
 	if (time() - intval(get_option('aktt_doing_tweet_download')) < 600) {
 		return;
 	}
+	// wait 10 min between downloads
+	if (time() - intval(get_option('last_tweet_download')) < 600) {
+		return;
+	}
 	update_option('aktt_doing_tweet_download', time());
 	global $wpdb, $aktt;
 	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
 		update_option('aktt_doing_tweet_download', '0');
-		die();
+		return;
 	}
 	require_once(ABSPATH.WPINC.'/class-snoopy.php');
 	$snoop = new Snoopy;
@@ -679,6 +683,7 @@ function aktt_update_tweets() {
 
 	$hash = md5($data);
 	if ($hash == get_option('aktt_update_hash')) {
+		update_option('last_tweet_download', time());
 		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
