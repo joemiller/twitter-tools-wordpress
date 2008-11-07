@@ -1710,8 +1710,8 @@ function aktt_post_options() {
 }
 add_action('edit_form_advanced', 'aktt_post_options');
 
-function aktt_store_post_options($post_id, $post) {
-	if ($post->post_type == 'revision') {
+function aktt_store_post_options($post_id, $post = false) {
+	if (!$post || $post->post_type == 'revision') {
 		return;
 	}
 	if (!empty($_POST['aktt_notify_twitter'])) {
