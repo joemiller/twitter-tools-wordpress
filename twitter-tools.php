@@ -2,7 +2,7 @@
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
-Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. <a href="options-general.php?page=twitter-tools.php">Configure your settings here</a>.
+Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter.
 Version: 1.5
 Author: Alex King
 Author URI: http://alexking.org
@@ -1738,6 +1738,16 @@ function aktt_menu_items() {
 	}
 }
 add_action('admin_menu', 'aktt_menu_items');
+
+function aktt_plugin_action_links($links, $file) {
+	$plugin_file = basename(__FILE__);
+	if ($file == $plugin_file) {
+		$settings_link = '<a href="options-general.php?page='.$plugin_file.'">'.__('Settings', 'twitter-tools').'</a>';
+		array_unshift($links, $settings_link);
+	}
+	return $links;
+}
+add_filter('plugin_action_links', 'aktt_plugin_action_links', 10, 2);
 
 if (!function_exists('trim_add_elipsis')) {
 	function trim_add_elipsis($string, $limit = 100) {
