@@ -2,8 +2,8 @@
 Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, widget
 Contributors: alexkingorg
 Requires at least: 2.3
-Tested up to: 2.3.1
-Stable tag: 1.1b1
+Tested up to: 2.7
+Stable tag: 1.5
 
 Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
 
@@ -77,6 +77,10 @@ Example psuedo-code:
 = What happens if I have both my tweets posting to my blog as posts and my posts sent to Twitter? Will it cause the world to end in a spinning fireball of death? = 
 
 Actually, Twitter Tools has taken this into account and you can safely enable both creating posts from your tweets and tweets from your posts without duplicating them in either place.
+
+= Does Twitter Tools use a URL shortening service? =
+
+No, Twitter Tools sends your long URL to Twitter and Twitter chooses to shorten it or not.
 
 = Anything else? =
 

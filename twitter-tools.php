@@ -356,86 +356,74 @@ class twitter_tools {
 		
 		if (!$start || !$end) return false;
 
-		// success indicator
-		$success = false;
-		
 		// flag us as busy
 		update_option('aktt_doing_digest_post', '1');
 		remove_action('publish_post', 'aktt_notify_twitter');
 
-//		try {
+		// see if there's any tweets in the time range
+		global $wpdb;
 		
-			// see if there's any tweets in the time range
-			global $wpdb;
-			
-			$startGMT = gmdate("Y-m-d H:i:s", $start);
-			$endGMT = gmdate("Y-m-d H:i:s", $end);
-			
-			// build sql
-			$conditions = array();
-			$conditions[] = "tw_created_at >= '{$startGMT}'";
-			$conditions[] = "tw_created_at <= '{$endGMT}'";
-			$conditions[] = "tw_text NOT LIKE '$this->tweet_prefix%'";
-			if ($this->exclude_reply_tweets) {
-				$conditions[] = "tw_text NOT LIKE '@%'";
+		$startGMT = gmdate("Y-m-d H:i:s", $start);
+		$endGMT = gmdate("Y-m-d H:i:s", $end);
+		
+		// build sql
+		$conditions = array();
+		$conditions[] = "tw_created_at >= '{$startGMT}'";
+		$conditions[] = "tw_created_at <= '{$endGMT}'";
+		$conditions[] = "tw_text NOT LIKE '$this->tweet_prefix%'";
+		if ($this->exclude_reply_tweets) {
+			$conditions[] = "tw_text NOT LIKE '@%'";
+		}
+		$where = implode(' AND ', $conditions);
+		
+		$sql = "
+			SELECT * FROM {$wpdb->aktt}
+			WHERE {$where}
+			GROUP BY tw_id
+			ORDER BY tw_created_at {$this->digest_tweet_order}
+		";
+
+		$tweets = $wpdb->get_results($sql);
+
+		if (count($tweets) > 0) {
+		
+			$tweets_to_post = array();
+			foreach ($tweets as $data) {
+				$tweet = new aktt_tweet;
+				$tweet->tw_text = $data->tw_text;
+				$tweet->tw_reply_tweet = $data->tw_reply_tweet;
+				if (!$tweet->tweet_is_post_notification() || ($tweet->tweet_is_reply() && $this->exclude_reply_tweets)) {
+					$tweets_to_post[] = $data;
+				}
 			}
-			$where = implode(' AND ', $conditions);
-			
-			$sql = "
-				SELECT * FROM {$wpdb->aktt}
-				WHERE {$where}
-				GROUP BY tw_id
-				ORDER BY tw_created_at {$this->digest_tweet_order}
-			";
 
-			$tweets = $wpdb->get_results($sql);
-
-			if (count($tweets) > 0) {
-			
-				$tweets_to_post = array();
-				foreach ($tweets as $data) {
-					$tweet = new aktt_tweet;
-					$tweet->tw_text = $data->tw_text;
-					$tweet->tw_reply_tweet = $data->tw_reply_tweet;
-					if (!$tweet->tweet_is_post_notification() || ($tweet->tweet_is_reply() && $this->exclude_reply_tweets)) {
-						$tweets_to_post[] = $data;
-					}
+			if (count($tweets_to_post) > 0) {
+				$content = '<ul class="aktt_tweet_digest">'."\n";
+				foreach ($tweets_to_post as $tweet) {
+					$content .= '	<li>'.aktt_tweet_display($tweet, 'absolute').'</li>'."\n";
+				}
+				$content .= '</ul>'."\n";
+				if ($this->give_tt_credit == '1') {
+					$content .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
 				}
 
-				if (count($tweets_to_post) > 0) {
-					$content = '<ul class="aktt_tweet_digest">'."\n";
-					foreach ($tweets_to_post as $tweet) {
-						$content .= '	<li>'.aktt_tweet_display($tweet, 'absolute').'</li>'."\n";
-					}
-					$content .= '</ul>'."\n";
-					if ($this->give_tt_credit == '1') {
-						$content .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
-					}
+				$post_data = array(
+					'post_content' => $wpdb->escape($content),
+					'post_title' => $wpdb->escape(sprintf($title, date('Y-m-d'))),
+					'post_date' => date('Y-m-d 23:59:59'),
+					'post_category' => array($this->blog_post_category),
+					'post_status' => 'publish',
+					'post_author' => $wpdb->escape($this->blog_post_author)
+				);
 
-					$post_data = array(
-						'post_content' => $wpdb->escape($content),
-						'post_title' => $wpdb->escape(sprintf($title, date('Y-m-d'))),
-						'post_date' => date('Y-m-d 23:59:59'),
-						'post_category' => array($this->blog_post_category),
-						'post_status' => 'publish',
-						'post_author' => $wpdb->escape($this->blog_post_author)
-					);
+				$post_id = wp_insert_post($post_data);
 
-					$post_id = wp_insert_post($post_data);
-
-					add_post_meta($post_id, 'aktt_tweeted', '1', true);
-					wp_set_post_tags($post_id, $this->blog_post_tags);
-				}
-
+				add_post_meta($post_id, 'aktt_tweeted', '1', true);
+				wp_set_post_tags($post_id, $this->blog_post_tags);
 			}
+
+		}
 			
-			// indicate everything is swell
-			$success = true;
-			
-//		} catch (Exception $e) {
-			// dbg('oops', $e->getMessage());
-//		}
-		
 		add_action('publish_post', 'aktt_notify_twitter');
 		update_option('aktt_doing_digest_post', '0');
 		return $success;
