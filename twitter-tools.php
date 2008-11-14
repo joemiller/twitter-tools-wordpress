@@ -28,12 +28,6 @@ Author URI: http://alexking.org
 
 load_plugin_textdomain('twitter-tools');
 
-if (!function_exists('dbg')) {
-	function dbg() {
-		return;
-	}
-}
-
 if (!function_exists('is_admin_page')) {
 	function is_admin_page() {
 		if (function_exists('is_admin')) {
@@ -630,7 +624,7 @@ function aktt_login_test($username, $password) {
 	} else {
 		$json = new Services_JSON();
 		$results = $json->decode($snoop->results);
-		return print_r($results);
+		return sprintf(__('Sorry, login failed. Error message from Twitter: %s', 'twitter-tools'), $results->error);
 	}
 }
 
@@ -950,11 +944,6 @@ function aktt_widget_init() {
 }
 add_action('widgets_init', 'aktt_widget_init');
 
-function aktt_settings() {
-	global $aktt;
-	dbg('settings', $aktt->settings());
-}
-
 function aktt_init() {
 	global $wpdb, $aktt;
 	$aktt = new twitter_tools;
@@ -1138,7 +1127,7 @@ function akttTestLogin() {
 		}
 		, function(data) {
 			result.html(data).removeClass('aktt_login_result_wait');
-			setTimeout('akttTestLoginResult();', 2000);
+			setTimeout('akttTestLoginResult();', 5000);
 		}
 	);
 };
@@ -1581,8 +1570,8 @@ function aktt_options_form() {
 					<fieldset class="options">
 						<div class="option">
 							<label for="aktt_twitter_username">'.__('Twitter Username', 'twitter-tools').'/'.__('Password', 'twitter-tools').'</label>
-							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" />
-							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" />
+							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" autocomplete="off" />
+							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" autocomplete="off" />
 							<input type="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
 							<span id="aktt_login_test_result"></span>
 						</div>
