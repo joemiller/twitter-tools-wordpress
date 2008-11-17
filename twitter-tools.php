@@ -19,6 +19,7 @@ Author URI: http://alexking.org
 // Thanks to John Ford ( http://www.aldenta.com ) for his contributions.
 // Thanks to Dougal Campbell ( http://dougal.gunters.org ) for his contributions.
 // Thanks to Silas Sewell ( http://silas.sewell.ch ) for his contributions.
+// Thanks to Greg Grubbs for his contributions.
 //
 // **********************************************************************
 // This program is distributed in the hope that it will be useful, but
