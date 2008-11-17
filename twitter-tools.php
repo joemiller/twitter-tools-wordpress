@@ -420,7 +420,7 @@ class twitter_tools {
 			
 		add_action('publish_post', 'aktt_notify_twitter');
 		update_option('aktt_doing_digest_post', '0');
-		return $success;
+		return true;
 	}
 	
 	function tweet_download_interval() {
