@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter.
-Version: 1.5.1
+Version: 1.5.1a
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -1384,6 +1384,14 @@ function akttTestLoginResult() {
 #ak_twittertools .active .daypicker {
 	display: block
 }
+fieldset.experimental {
+	border: 2px solid #900;
+	padding: 10px;
+}
+fieldset.experimental legend {
+	color: #900;
+	font-weight: bold;
+}
 <?php
 				die();
 				break;
@@ -1588,6 +1596,9 @@ function aktt_options_form() {
 							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
 							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
 						</div>
+						<fieldset class="experimental">
+							<legend>Experimental Digest Features</legend>
+							<p>These features are considered experimental and may cause problems. Use with care.</p>
 						<div class="option time_toggle">
 							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
 							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
@@ -1609,11 +1620,11 @@ function aktt_options_form() {
 							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.$aktt->digest_title_weekly.'" />
 							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
 						</div>
-						
 						<div class="option">
 							<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
 							<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
 						</div>
+						</fieldset>
 						<div class="option">
 							<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
 							<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
