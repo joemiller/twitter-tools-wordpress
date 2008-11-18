@@ -1598,7 +1598,7 @@ function aktt_options_form() {
 						</div>
 						<fieldset class="experimental">
 							<legend>Experimental Digest Features</legend>
-							<p>These features are considered experimental and may cause problems. Use with care.</p>
+							<p>These features are considered experimental and may cause http://alexking.org/blog/2008/11/16/twitter-tools-digest-problems<a href="http://alexking.org/blog/2008/11/16/twitter-tools-digest-problems">problems</a>. Use with care.</p>
 						<div class="option time_toggle">
 							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
 							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
