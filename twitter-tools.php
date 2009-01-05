@@ -405,7 +405,7 @@ class twitter_tools {
 				$post_data = array(
 					'post_content' => $wpdb->escape($content),
 					'post_title' => $wpdb->escape(sprintf($title, date('Y-m-d'))),
-					'post_date' => date('Y-m-d H:i:s'.$end),
+					'post_date' => date('Y-m-d H:i:s', $end),
 					'post_category' => array($this->blog_post_category),
 					'post_status' => 'publish',
 					'post_author' => $wpdb->escape($this->blog_post_author)
