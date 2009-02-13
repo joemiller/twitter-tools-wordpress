@@ -959,7 +959,7 @@ function aktt_init() {
 	}
 	global $wp_version;
 	if (isset($wp_version) && version_compare($wp_version, '2.5', '>=') && empty ($aktt->install_date)) {
-		add_action('admin_notices', create_function( '', "echo '<div class=\"error\">Please update your <a href=\"".get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php\">Twitter Tools settings</a>.</div>';" ) );
+		add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>Please update your <a href=\"".get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php\">Twitter Tools settings</a>.</p></div>';" ) );
 	}
 }
 add_action('init', 'aktt_init');
@@ -1455,13 +1455,16 @@ function aktt_options_form() {
 	$categories = get_categories('hide_empty=0');
 	$cat_options = '';
 	foreach ($categories as $category) {
-		if ($category->term_id == $aktt->blog_post_category) {
+// WP < 2.3 compatibility
+		!empty($category->term_id) ? $cat_id = $category->term_id : $cat_id = $category->cat_ID;
+		!empty($category->name) ? $cat_name = $category->name : $cat_name = $category->cat_name;
+		if ($cat_id == $aktt->blog_post_category) {
 			$selected = 'selected="selected"';
 		}
 		else {
 			$selected = '';
 		}
-		$cat_options .= "\n\t<option value='$category->term_id' $selected>$category->name</option>";
+		$cat_options .= "\n\t<option value='$cat_id' $selected>$cat_name</option>";
 	}
 
 	$authors = get_users_of_blog();
