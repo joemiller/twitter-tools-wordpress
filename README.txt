@@ -90,12 +90,19 @@ Yes, Twitter Tools includes a filter:
 
 as of version 1.6. Plugins for this filter may already exist, or you can create your own. The plugin needs to attach to this filter using the standard WordPress `add_filter()` function and return a URL that will then be passed with your blog post tweet.
 
-= Is there any way to change the prefix of my blog posts that get tweeted? =
+= Is there any way to change the 'New Blog Post:' prefix when my new posts get tweeted? =
 
-Yes there is.  The change is made in the code of the plugin, just look for and modify the following line: 
-$this->tweet_prefix = 'New blog post';
+Yes there is, but you have to change the code in the plugin file. 
 
-The reason this is done this way, and not as an easily changeable option from the admin screen, is so that the plugin correctly ignores the tweets that originated from previous blog posts when creating the digest posts, displaying the latest tweet, and displaying sidebar tweets.
+The reason this is done this way, and not as an easily changeable option from the admin screen, is so that the plugin correctly identifies the tweets that originated from previous blog posts when creating the digest posts, displaying the latest tweet, displaying sidebar tweets, and creating blog posts from tweets (you don't want tweets that are blog post notifications being treated like tweets that originated on Twitter).
+
+To make the change, look for and modify the following line: 
+
+`$this->tweet_prefix = 'New blog post';`
+
+= Can I remove the 'New Blog Post:' prefix entirely? =
+
+No, this is not a good idea. Twitter Tools needs to be able to look at the beginning of the tweet and identify if it's a notification from your blog or not. Otherwise, Twitter Tools and Twitter could keep passing the blog posts and resulting tweets back and forth resulting in the 'spinning fireball of death' mentioned above.
 
 = Anything else? =
 
