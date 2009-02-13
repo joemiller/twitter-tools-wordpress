@@ -11,9 +11,9 @@ Twitter Tools is a plugin that creates a complete integration between your WordP
 
 Twitter Tools integrates with Twitter by giving you the following functionality:
 
-* Archive your Twitter tweets (downloaded every 15 minutes)
+* Archive your Twitter tweets (downloaded every 10 minutes)
 * Create a blog post from each of your tweets
-* Create a daily digest post of your tweets
+* Create a daily or weekly digest post of your tweets
 * Create a tweet on Twitter whenever you post in your blog, with a link to the blog post
 * Post a tweet from your sidebar
 * Post a tweet from the WP Admin screens
@@ -78,9 +78,24 @@ Example psuedo-code:
 
 Actually, Twitter Tools has taken this into account and you can safely enable both creating posts from your tweets and tweets from your posts without duplicating them in either place.
 
-= Does Twitter Tools use a URL shortening service? =
+= Does Twitter Tools use a URL shortening service by default? =
 
 No, Twitter Tools sends your long URL to Twitter and Twitter chooses to shorten it or not.
+
+= Can Twitter Tools use a URL shortening service? =
+
+Yes, Twitter Tools includes a filter:
+
+`tweet_blog_post_url`
+
+as of version 1.6. Plugins for this filter may already exist, or you can create your own. The plugin needs to attach to this filter using the standard WordPress `add_filter()` function and return a URL that will then be passed with your blog post tweet.
+
+= Is there any way to change the prefix of my blog posts that get tweeted? =
+
+Yes there is.  The change is made in the code of the plugin, just look for and modify the following line: 
+$this->tweet_prefix = 'New blog post';
+
+The reason this is done this way, and not as an easily changeable option from the admin screen, is so that the plugin correctly ignores the tweets that originated from previous blog posts when creating the digest posts, displaying the latest tweet, and displaying sidebar tweets.
 
 = Anything else? =
 
