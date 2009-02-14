@@ -1573,7 +1573,7 @@ function aktt_options_form() {
 						</div>
 						<div class="option">
 							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
-							<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for scheduled posts and posts via XML-RPC', 'twitter-tools').'</span>
+							<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for posting via XML-RPC', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
 							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
@@ -1690,6 +1690,7 @@ add_action('edit_form_advanced', 'aktt_post_options');
 
 function aktt_store_post_options($post_id, $post = false) {
 	global $aktt;
+	$post = get_post($post_id);
 	if (!$post || $post->post_type == 'revision') {
 		return;
 	}
