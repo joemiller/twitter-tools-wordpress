@@ -532,7 +532,9 @@ class aktt_tweet {
 	}
 	
 	function tweet_is_reply() {
-		return !empty($this->tw_reply_tweet);
+// Twitter data changed - users still expect anything starting with @ is a reply
+//		return !empty($this->tw_reply_tweet);
+		return (substr($this->tw_text, 0, 1) == '@');
 	}
 	
 	function add() {
