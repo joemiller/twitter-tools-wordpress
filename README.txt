@@ -64,6 +64,17 @@ Example psuedo-code:
 `function my_status_update($tweet) { // do something here }`
 `add_action('aktt_add_tweet', 'my_status_update')`
 
+Twitter Tools also provides a filter on the URL sent to Twitter so that you can run it through an URL-shortening service if you like.
+
+`tweet_blog_post_url`
+
+Your plugin function will receive the URL as the first parameter.
+
+Example psuedo-code:
+
+`function my_short_url($long_url) { // do something here - return the shortened URL }`
+`add_filter('tweet_blog_post_url', 'my_short_url')`
+
 
 == Known Issues ==
 
@@ -73,6 +84,10 @@ Example psuedo-code:
 
 
 == Frequently Asked Questions ==
+
+= Who is allowed to post a Tweet from within WordPress? =
+
+Anyone who has a 'publish_post' permission. Basically, if you can post to the blog, you can also post to Twitter (using the account info in the Twitter Tools configuration).
 
 = What happens if I have both my tweets posting to my blog as posts and my posts sent to Twitter? Will it cause the world to end in a spinning fireball of death? = 
 
