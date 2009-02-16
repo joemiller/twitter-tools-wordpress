@@ -174,7 +174,7 @@ class twitter_tools {
 		$this->last_tweet_download = '';
 		$this->doing_tweet_download = '0';
 		$this->doing_digest_post = '0';
-		$this->version = '1.6b1';
+		$this->version = '1.6';
 	}
 	
 	function upgrade() {
