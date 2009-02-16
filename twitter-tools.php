@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter.
-Version: 1.6b1
+Version: 1.6b2
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -445,6 +445,7 @@ class twitter_tools {
 	}
 	
 	function do_blog_post_tweet($post_id = 0) {
+// this is only called on the publish_post hook
 		if ($this->notify_twitter == '0'
 			|| $post_id == 0
 			|| get_post_meta($post_id, 'aktt_tweeted', true) == '1'
@@ -458,7 +459,7 @@ class twitter_tools {
 			return;
 		}
 		// check for private posts
-		if ($post->post_status != 'publish') {
+		if ($post->post_status == 'private') {
 			return;
 		}
 		$tweet = new aktt_tweet;
@@ -1667,7 +1668,18 @@ function aktt_post_options() {
 			<div class="inside">
 			<p>Notify Twitter about this post?
 			';
-		if (get_post_meta($post->ID, 'aktt_notify_twitter', true) == 'no' || !$aktt->notify_twitter_default) {
+		$notify = get_post_meta($post->ID, 'aktt_notify_twitter', true);
+		if ($notify == '') {
+			switch ($aktt->notify_twitter_default) {
+				case '1':
+					$notify = 'yes';
+					break;
+				case '0':
+					$notify = 'no';
+					break;
+			}
+		}
+		if ($notify == 'no') {
 			$yes = '';
 			$no = 'checked="checked"';
 		}
@@ -1676,7 +1688,7 @@ function aktt_post_options() {
 			$no = '';
 		}
 		echo '
-		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">Yes</label>&nbsp;&nbsp;
+		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">Yes</label> &nbsp;&nbsp;
 		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_no" value="no" '.$no.' /> <label for="aktt_notify_twitter_no">No</label>
 		';
 		echo '
@@ -1694,14 +1706,27 @@ function aktt_store_post_options($post_id, $post = false) {
 	if (!$post || $post->post_type == 'revision') {
 		return;
 	}
-	if ((!empty($_POST['aktt_notify_twitter']) && $_POST['aktt_notify_twitter'] == "yes") || (empty($_POST['aktt_notify_twitter']) && $aktt->notify_twitter_default)) {
-		$notify = 'yes';
+
+	$notify_meta = get_post_meta($post_id, 'aktt_notify_twitter', true);
+	$posted_meta = $_POST['aktt_notify_twitter'];
+
+	$save = false;
+	if (!empty($posted_meta)) {
+		$posted_meta == 'yes' ? $meta = 'yes' : $meta = 'no';
+		$save = true;
+	}
+	else if (empty($notify_meta)) {
+		$aktt->notify_twitter_default ? $meta = 'yes' : $meta = 'no';
+		$save = true;
 	}
 	else {
-		$notify = 'no';
+		$save = false;
 	}
-	if (!update_post_meta($post_id, 'aktt_notify_twitter', $notify)) {
-		add_post_meta($post_id, 'aktt_notify_twitter', $notify);
+	
+	if ($save) {
+		if (!update_post_meta($post_id, 'aktt_notify_twitter', $meta)) {
+			add_post_meta($post_id, 'aktt_notify_twitter', $meta);
+		}
 	}
 }
 add_action('draft_post', 'aktt_store_post_options', 1, 2);
