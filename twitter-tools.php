@@ -464,7 +464,7 @@ class twitter_tools {
 		}
 		$tweet = new aktt_tweet;
 		$url = apply_filters('tweet_blog_post_url', get_permalink($post_id));
-		$tweet->tw_text = sprintf(__($this->tweet_format, 'twitter-tools'), $post->post_title, $url);
+		$tweet->tw_text = sprintf(__($this->tweet_format, 'twitter-tools'), html_entity_decode($post->post_title, ENT_COMPAT, 'UTF-8'), $url);
 		$this->do_tweet($tweet);
 		add_post_meta($post_id, 'aktt_tweeted', '1', true);
 	}
