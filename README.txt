@@ -64,6 +64,8 @@ Example psuedo-code:
 `function my_status_update($tweet) { // do something here }`
 `add_action('aktt_add_tweet', 'my_status_update')`
 
+---
+
 Twitter Tools also provides a filter on the URL sent to Twitter so that you can run it through an URL-shortening service if you like.
 
 `tweet_blog_post_url`
@@ -72,8 +74,72 @@ Your plugin function will receive the URL as the first parameter.
 
 Example psuedo-code:
 
-`function my_short_url($long_url) { // do something here - return the shortened URL }`
+`function my_short_url($long_url) {
+	// do something here - return the shortened URL 
+	$short_url = my_short_url_func($long_url);
+	return $short_url;
+}`
 `add_filter('tweet_blog_post_url', 'my_short_url')`
+
+---
+
+`aktt_do_tweet`
+
+Returning false in this hook will prevent a tweet from being sent. One parameter is sent, the Tweet object to be sent to Twitter.
+
+Example psuedo-code:
+
+`function dont_tweet($tweet) {
+	if (some condition) {
+		// will not tweet
+		return false;
+	}
+	else {
+		// must return the $tweet to send it
+		return $tweet;
+	}
+}`
+`add_filter('aktt_do_tweet', 'dont_tweet')`
+
+---
+
+`aktt_do_blog_post_tweet`
+
+Returning false in this hook will prevent a blog post Tweet from being sent. Two parameters are passed, the Tweet object to be sent to Twitter and the Post generating the Tweet.
+
+Example psuedo-code:
+
+`function dont_post_tweet($tweet, $post) {
+	if (some condition) {
+		// will not tweet
+		return false;
+	}
+	else {
+		// must return the $tweet to send it
+		return $tweet;
+	}
+}`
+`add_filter('aktt_do_blog_post_tweet', 'dont_post_tweet', 10, 2)`
+
+---
+
+`aktt_do_tweet_post`
+
+Returning false in this hook will prevent a blog post from being created from a Tweet. Two parameters are passed, the data to be used in the post and the Tweet object.
+
+Example psuedo-code:
+
+`function dont_tweet_post($post, $data) {
+	if (some condition) {
+		// will not post
+		return false;
+	}
+	else {
+		// must return the $data for a post to be created
+		return $data;
+	}
+}`
+`add_filter('aktt_do_tweet_post', 'dont_tweet_post', 10, 2)`
 
 
 == Known Issues ==
