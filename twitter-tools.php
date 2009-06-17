@@ -374,6 +374,8 @@ class twitter_tools {
 					$tweets_to_post[] = $data;
 				}
 			}
+			
+			$tweets_to_post = apply_filters('aktt_tweets_to_digest_post', $tweets_to_post); // here's your chance to alter the tweet list that will be posted as the digest
 
 			if (count($tweets_to_post) > 0) {
 				$content = '<ul class="aktt_tweet_digest">'."\n";
