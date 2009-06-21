@@ -67,7 +67,7 @@ function aktt_bitly_request_handler() {
 
 			case 'aktt_bitly_update_settings':
 				aktt_bitly_save_settings();
-				wp_redirect(trailingslashit(get_bloginfo('wpurl')).'wp-admin/options-general.php?page='.basename(__FILE__).'&updated=true');
+				wp_redirect(trailingslashit(get_bloginfo('wpurl')).'wp-admin/options-general.php?page=twitter-tools.php&updated=true');
 				die();
 				break;
 		}

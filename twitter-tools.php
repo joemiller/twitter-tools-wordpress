@@ -1696,6 +1696,9 @@ function aktt_post_options() {
 		';
 		echo '
 			</p>
+		';
+		do_action('aktt_post_options');
+		echo '
 			</div><!--.inside-->
 			</div><!--.postbox-->
 		';
