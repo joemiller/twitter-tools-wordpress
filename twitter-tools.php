@@ -3,12 +3,12 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter.
-Version: 1.7dev
+Version: 2.0dev
 Author: Alex King
 Author URI: http://alexking.org
 */
 
-// Copyright (c) 2007-2008 Alex King. All rights reserved.
+// Copyright (c) 2007-2009 Crowd Favorite, Ltd., Alex King. All rights reserved.
 //
 // Released under the GPL license
 // http://www.opensource.org/licenses/gpl-license.php
@@ -38,20 +38,6 @@ if (is_file(trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools.php')) {
 }
 else if (is_file(trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools/twitter-tools.php')) {
 	define('AKTT_FILE', trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools/twitter-tools.php');
-}
-
-if (!function_exists('is_admin_page')) {
-	function is_admin_page() {
-		if (function_exists('is_admin')) {
-			return is_admin();
-		}
-		if (function_exists('check_admin_referer')) {
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
 }
 
 if (!function_exists('wp_prototype_before_jquery')) {
@@ -384,7 +370,7 @@ class twitter_tools {
 				}
 				$content .= '</ul>'."\n";
 				if ($this->give_tt_credit == '1') {
-					$content .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+					$content .= '<p class="aktt_credit">'.__('Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>', 'twitter-tools').'</p>';
 				}
 
 				$post_data = array(
@@ -762,7 +748,7 @@ function aktt_sidebar_tweets() {
 		$output .= '		<li>'.__('No tweets available at the moment.', 'twitter-tools').'</li>'."\n";
 	}
 	if (!empty($aktt->twitter_username)) {
-  		$output .= '		<li class="aktt_more_updates"><a href="'.aktt_profile_url($aktt->twitter_username).'">More updates...</a></li>'."\n";
+  		$output .= '		<li class="aktt_more_updates"><a href="'.aktt_profile_url($aktt->twitter_username).'">'.__('More updates...', 'twitter-tools').'</a></li>'."\n";
 	}
 	$output .= '</ul>';
 	if ($aktt->tweet_from_sidebar == '1' && !empty($aktt->twitter_username) && !empty($aktt->twitter_password)) {
@@ -770,7 +756,7 @@ function aktt_sidebar_tweets() {
 		  $output .= '	<p id="aktt_tweet_posted_msg">'.__('Posting tweet...', 'twitter-tools').'</p>';
 	}
 	if ($aktt->give_tt_credit == '1') {
-		$output .= '<p class="aktt_credit">Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>.</p>';
+		$output .= '<p class="aktt_credit">'.__('Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>', 'twitter-tools').'</p>';
 	}
 	$output .= '</div>';
 	print($output);
@@ -895,7 +881,7 @@ function aktt_tweet_form($type = 'input', $extra = '') {
 		}
 		$output .= '
 		<p>
-			<input type="submit" id="aktt_tweet_submit" name="aktt_tweet_submit" value="'.__('Post Tweet!', 'twitter-tools').'" />
+			<input type="submit" id="aktt_tweet_submit" name="aktt_tweet_submit" value="'.__('Post Tweet!', 'twitter-tools').'" class="button-primary" />
 			<span id="aktt_char_count"></span>
 		</p>
 		<div class="clear"></div>
@@ -976,7 +962,7 @@ function aktt_init() {
 	}
 	global $wp_version;
 	if (isset($wp_version) && version_compare($wp_version, '2.5', '>=') && empty ($aktt->install_date)) {
-		add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>Please update your <a href=\"".get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php\">Twitter Tools settings</a>.</p></div>';" ) );
+		add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Please update your <a href="%s">Twitter Tools settings</a>', 'popularity-contest'), get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php")."</p></div>';" ) );
 	}
 }
 add_action('init', 'aktt_init');
@@ -1337,7 +1323,6 @@ function akttTestLoginResult() {
 }
 #ak_twittertools .option {
 	overflow: hidden;
-	border-bottom: dashed 1px #ccc;
 	padding-bottom: 9px;
 	padding-top: 9px;
 }
@@ -1517,8 +1502,8 @@ function aktt_options_form() {
 		$js_lib_options .= "\n\t<option value='$js_lib' $selected>$js_lib_display</option>";
 	}
 	$digest_tweet_orders = array(
-		'ASC' => 'Oldest first (Chronological order)'
-		, 'DESC' => 'Newest first (Reverse-chronological order)'
+		'ASC' => __('Oldest first (Chronological order)', 'twitter-tools'),
+		'DESC' => __('Newest first (Reverse-chronological order)', 'twitter-tools')
 	);
 	$digest_tweet_order_options = '';
 	foreach ($digest_tweet_orders as $digest_tweet_order => $digest_tweet_order_display) {
@@ -1579,7 +1564,7 @@ function aktt_options_form() {
 							<label for="aktt_twitter_username">'.__('Twitter Username', 'twitter-tools').'/'.__('Password', 'twitter-tools').'</label>
 							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" autocomplete="off" />
 							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" autocomplete="off" />
-							<input type="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
+							<input type="button" class="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
 							<span id="aktt_login_test_result"></span>
 						</div>
 						<div class="option">
@@ -1626,7 +1611,7 @@ function aktt_options_form() {
 						<div class="option">
 							<label for="aktt_blog_post_tags">'.__('Tag(s) for your tweet posts:', 'twitter-tools').'</label>
 							<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.$aktt->blog_post_tags.'">
-							<span>'._('Separate multiple tags with commas. Example: tweets, twitter').'</span>
+							<span>'.__('Separate multiple tags with commas. Example: tweets, twitter', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
 							<label for="aktt_blog_post_author">'.__('Author for tweet posts:', 'twitter-tools').'</label>
@@ -1655,18 +1640,22 @@ function aktt_options_form() {
 						</div>
 					</fieldset>
 					<p class="submit">
-						<input type="submit" name="submit" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
+						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
 					</p>
 				</form>
 				<h2>'.__('Update Tweets', 'twitter-tools').'</h2>
 				<form name="ak_twittertools_updatetweets" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="get">
-					<p>'.__('Use this button to manually update your tweets.', 'twitter-tools').'</p>
+					<p>'.__('Use this button to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
 					<p class="submit">
 						<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
 						<input type="submit" name="reset-button" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
 						<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
 					</p>
 				</form>
+	');
+	do_action('aktt_options_form');
+	print('
+				
 				<h2>'.__('README', 'twitter-tools').'</h2>
 				<p>'.__('Find answers to common questions here.', 'twitter-tools').'</p>
 				<iframe id="ak_readme" src="http://alexking.org/projects/wordpress/readme?project=twitter-tools"></iframe>
