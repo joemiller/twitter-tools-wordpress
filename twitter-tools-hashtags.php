@@ -2,7 +2,7 @@
 /*
 Plugin Name: Twitter Tools - Hashtags 
 Plugin URI: http://crowdfavorite.com/wordpress/ 
-Description: Set #hashtags for blog post tweets sent by Twitter Tools. 
+Description: Set #hashtags for blog post tweets sent by Twitter Tools. This plugin relies on Twitter Tools, configure it on the Twitter Tools settings page.
 Version: 1.0 
 Author: Crowd Favorite
 Author URI: http://crowdfavorite.com

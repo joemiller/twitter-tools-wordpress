@@ -185,10 +185,12 @@ To make the change, look for and modify the following line:
 
 No, this is not a good idea. Twitter Tools needs to be able to look at the beginning of the tweet and identify if it's a notification from your blog or not. Otherwise, Twitter Tools and Twitter could keep passing the blog posts and resulting tweets back and forth resulting in the 'spinning fireball of death' mentioned above.
 
-= Anything else? =
 
-That about does it - enjoy!
+== Changelog ==
 
---Alex King
+= 2.0 =
 
-http://alexking.org/projects/wordpress
+* Added various hooks and filters to enable other plugins to interact with Twitter Tools.
+* Initial release of Bit.ly for Twitter Tools - enables shortening your URLs and tracking them on your Bit.ly account.
+* Initial release of #hashtags for Twitter Tools - enables adding hashtags to your blog post tweets.
+* Initial release of Exclude Category for Twitter Tools - enables not tweeting posts in chosen categories.
