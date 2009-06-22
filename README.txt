@@ -55,7 +55,7 @@ If you just want your latest tweet, use this template tag.
 
 Twitter Tools contains a hook that can be used to pass along your tweet data to another service (for example, some folks have wanted to be able to update their Facebook status). To use this hook, create a plugin and add an action to:
 
-`aktt_add_tweet`
+`aktt_add_tweet` (action)
 
 Your plugin function will receive an `aktt_tweet` object as the first parameter.
 
@@ -68,7 +68,7 @@ Example psuedo-code:
 
 Twitter Tools also provides a filter on the URL sent to Twitter so that you can run it through an URL-shortening service if you like.
 
-`tweet_blog_post_url`
+`tweet_blog_post_url` (filter)
 
 Your plugin function will receive the URL as the first parameter.
 
@@ -83,7 +83,7 @@ Example psuedo-code:
 
 ---
 
-`aktt_do_tweet`
+`aktt_do_tweet` (filter)
 
 Returning false in this hook will prevent a tweet from being sent. One parameter is sent, the Tweet object to be sent to Twitter.
 
@@ -103,7 +103,7 @@ Example psuedo-code:
 
 ---
 
-`aktt_do_blog_post_tweet`
+`aktt_do_blog_post_tweet` (filter)
 
 Returning false in this hook will prevent a blog post Tweet from being sent. Two parameters are passed, the Tweet object to be sent to Twitter and the Post generating the Tweet.
 
@@ -123,7 +123,7 @@ Example psuedo-code:
 
 ---
 
-`aktt_do_tweet_post`
+`aktt_do_tweet_post` (filter)
 
 Returning false in this hook will prevent a blog post from being created from a Tweet. Two parameters are passed, the data to be used in the post and the Tweet object.
 
@@ -141,6 +141,23 @@ Example psuedo-code:
 }`
 `add_filter('aktt_do_tweet_post', 'dont_tweet_post', 10, 2)`
 
+---
+
+`aktt_tweets_to_digest_post` (filter)
+
+Allows you to make changes the tweets that will be included in a digest post.
+
+---
+
+`aktt_options_form` (action)
+
+Allows you to add to the Twitter Tools settings page.
+
+---
+
+`aktt_post_options` (action)
+
+Allows you to add to the Twitter Tools box on the New Post page (requires the option to tweet on blog posts to be enabled).
 
 == Known Issues ==
 
