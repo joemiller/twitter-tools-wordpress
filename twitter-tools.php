@@ -812,10 +812,10 @@ function aktt_make_clickable($tweet) {
 			, $tweet
 	);
 	$tweet = preg_replace_callback(
-		'/\#([a-zA-Z0-9_]{1,15})/'
+		'/\ #([a-zA-Z0-9_]{1,15})/'
 		, create_function(
 			'$matches'
-			, 'return aktt_hashtag_link($matches[1], \'#\', \'\');'
+			, 'return aktt_hashtag_link($matches[1], \' #\', \'\');'
 		)
 		, $tweet
 	);
