@@ -1436,13 +1436,13 @@ function aktt_admin_tweet_form() {
 	');
 	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
 		print('
-<p>Please enter your <a href="http://twitter.com">Twitter</a> account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.</p>		
+			<p>'.__('Please enter your <a href="http://twitter.com">Twitter</a> account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.', 'twitter-tools').'</p>		
 		');
 	}
 	else {
 		print('
 			<h2>'.__('Write Tweet', 'twitter-tools').'</h2>
-			<p>This will create a new \'tweet\' in <a href="http://twitter.com">Twitter</a> using the account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.</p>
+			<p>'.__('This will create a new \'tweet\' in <a href="http://twitter.com">Twitter</a> using the account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.', 'twitter-tools').'</p>
 			'.aktt_tweet_form('textarea').'
 		');
 	}
@@ -1667,10 +1667,9 @@ function aktt_post_options() {
 	global $aktt, $post;
 	if ($aktt->notify_twitter) {
 		echo '<div class="postbox">
-			<h3>Twitter Tools</h3>
+			<h3>'.__('Twitter Tools', 'twitter-tools').'</h3>
 			<div class="inside">
-			<p>Notify Twitter about this post?
-			';
+			<p>'.__('Notify Twitter about this post?', 'twitter-tools');
 		$notify = get_post_meta($post->ID, 'aktt_notify_twitter', true);
 		if ($notify == '') {
 			switch ($aktt->notify_twitter_default) {
@@ -1691,8 +1690,8 @@ function aktt_post_options() {
 			$no = '';
 		}
 		echo '
-		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">Yes</label> &nbsp;&nbsp;
-		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_no" value="no" '.$no.' /> <label for="aktt_notify_twitter_no">No</label>
+		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">'._('Yes', 'twitter-tools').'</label> &nbsp;&nbsp;
+		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_no" value="no" '.$no.' /> <label for="aktt_notify_twitter_no">'.__('No', 'twitter-tools').'</label>
 		';
 		echo '
 			</p>
@@ -1839,45 +1838,45 @@ function aktt_relativeTime ($date, $precision=2)
 	$seconds = $diff;
 
 	if ($months > 0) {
-		return date('Y-m-d', $time);
+		return date_i18n( __('Y-m-d', 'twitter-tools'), $time);
 	} else {
 		$relative_date = '';
 		if ($weeks > 0) {
 			// Weeks and days
-			$relative_date .= ($relative_date?', ':'').$weeks.' week'.($weeks>1?'s':'');
+			$relative_date .= ($relative_date?', ':'').$weeks.' '.__ngettext('week', 'weeks', $weeks, 'twitter-tools');
 			if ($precision <= 2) {
-				$relative_date .= $days>0?($relative_date?', ':'').$days.' day'.($days>1?'s':''):'';
+				$relative_date .= $days>0? ($relative_date?', ':'').$days.' '.__ngettext('day', 'days', $days, 'twitter-tools'):'';
 				if ($precision == 1) {
-					$relative_date .= $hours>0?($relative_date?', ':'').$hours.' hr'.($hours>1?'s':''):'';
+					$relative_date .= $hours>0?($relative_date?', ':'').$hours.' '.__ngettext('hr', 'hrs', $hours, 'twitter-tools'):'';
 				}
 			}
 		} elseif ($days > 0) {
 			// days and hours
-			$relative_date .= ($relative_date?', ':'').$days.' day'.($days>1?'s':'');
+			$relative_date .= ($relative_date?', ':'').$days.' '.__ngettext('day', 'days', $days, 'twitter-tools');
 			if ($precision <= 2) {
-				$relative_date .= $hours>0?($relative_date?', ':'').$hours.' hr'.($hours>1?'s':''):'';
+				$relative_date .= $hours>0?($relative_date?', ':'').$hours.' '.__ngettext('hr', 'hrs', $hours, 'twitter-tools'):'';
 				if ($precision == 1) {
-					$relative_date .= $minutes>0?($relative_date?', ':'').$minutes.' min'.($minutes>1?'s':''):'';
+					$relative_date .= $minutes>0?($relative_date?', ':'').$minutes.' '.__ngettext('min', 'mins', $minutes, 'twitter-tools'):'';
 				}
 			}
 		} elseif ($hours > 0) {
 			// hours and minutes
-			$relative_date .= ($relative_date?', ':'').$hours.' hr'.($hours>1?'s':'');
+			$relative_date .= ($relative_date?', ':'').$hours.' '.__ngettext('hr', 'hrs', $hours, 'twitter-tools');
 			if ($precision <= 2) {
-				$relative_date .= $minutes>0?($relative_date?', ':'').$minutes.' min'.($minutes>1?'s':''):'';
+				$relative_date .= $minutes>0?($relative_date?', ':'').$minutes.' '.__ngettext('min', 'mins', $minutes, 'twitter-tools'):'';
 				if ($precision == 1) {
-					$relative_date .= $seconds>0?($relative_date?', ':'').$seconds.' sec'.($seconds>1?'s':''):'';
+					$relative_date .= $seconds>0?($relative_date?', ':'').$seconds.' '.__ngettext('sec', 'secs', $seconds, 'twitter-tools'):'';
 				}
 			}
 		} elseif ($minutes > 0) {
 			// minutes only
-			$relative_date .= ($relative_date?', ':'').$minutes.' min'.($minutes>1?'s':'');
+			$relative_date .= ($relative_date?', ':'').$minutes.' '.__ngettext('min', 'mins', $minutes, 'twitter-tools');
 			if ($precision == 1) {
-				$relative_date .= $seconds>0?($relative_date?', ':'').$seconds.' sec'.($seconds>1?'s':''):'';
+				$relative_date .= $seconds>0?($relative_date?', ':'').$seconds.' '.__ngettext('sec', 'secs', $seconds, 'twitter-tools'):'';
 			}
 		} else {
 			// seconds only
-			$relative_date .= ($relative_date?', ':'').$seconds.' sec'.($seconds>1?'s':'');
+			$relative_date .= ($relative_date?', ':'').$seconds.' '.__ngettext('sec', 'secs', $seconds, 'twitter-tools');
 		}
 	}
 
