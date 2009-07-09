@@ -372,7 +372,6 @@ class twitter_tools {
 				if ($this->give_tt_credit == '1') {
 					$content .= '<p class="aktt_credit">'.__('Powered by <a href="http://alexking.org/projects/wordpress">Twitter Tools</a>', 'twitter-tools').'</p>';
 				}
-
 				$post_data = array(
 					'post_content' => $wpdb->escape($content),
 					'post_title' => $wpdb->escape(sprintf($title, date('Y-m-d'))),
@@ -381,6 +380,7 @@ class twitter_tools {
 					'post_status' => 'publish',
 					'post_author' => $wpdb->escape($this->blog_post_author)
 				);
+				$post_data = apply_filters('aktt_digest_post_data', $post_data); // last chance to alter the digest content
 
 				$post_id = wp_insert_post($post_data);
 
@@ -798,6 +798,7 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 			break;
 	}
 	$output .= ' <a href="'.aktt_status_url($aktt->twitter_username, $tweet->tw_id).'">'.$time_display.'</a>';
+	$output = apply_filters('aktt_tweet_display', $output, $tweet); // allows you to alter the tweet display output
 	return $output;
 }
 
