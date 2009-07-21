@@ -122,6 +122,7 @@ class twitter_tools {
 			, 'tweet_from_sidebar'
 			, 'give_tt_credit'
 			, 'exclude_reply_tweets'
+			, 'tweet_prefix'
 			, 'last_tweet_download'
 			, 'doing_tweet_download'
 			, 'doing_digest_post'
@@ -152,9 +153,9 @@ class twitter_tools {
 		$this->install_date = '';
 		$this->js_lib = 'jquery';
 		$this->digest_tweet_order = 'ASC';
+		$this->tweet_prefix = 'New blog post';
 		// not included in options
 		$this->update_hash = '';
-		$this->tweet_prefix = 'New blog post';
 		$this->tweet_format = $this->tweet_prefix.': %s %s';
 		$this->last_digest_post = '';
 		$this->last_tweet_download = '';
@@ -189,6 +190,15 @@ class twitter_tools {
 				AFTER `tw_reply_username`
 			");
 		}
+		$this->upgrade_default_tweet_prefix();
+	}
+	
+	function upgrade_default_tweet_prefix() {
+		$prefix = get_option('aktt_tweet_prefix');
+		if (empty($prefix)) {
+			$aktt_defaults = new twitter_tools;
+			update_option('aktt_tweet_prefix', $aktt_defaults->tweet_prefix);
+		}
 	}
 
 	function get_settings() {
@@ -221,6 +231,7 @@ class twitter_tools {
 			}
 			$this->initiate_digests();
 			$this->upgrade();
+			$this->upgrade_default_tweet_prefix();
 		}
 	}
 	
@@ -714,6 +725,13 @@ function aktt_reset_tweet_checking($hash = '', $time = 0) {
 	update_option('aktt_doing_tweet_download', '0');
 }
 
+function aktt_reset_digests() {
+	if (!current_user_can('manage_options')) {
+		return;
+	}
+	update_option('aktt_doing_digest_post', '0');
+}
+
 function aktt_notify_twitter($post_id) {
 	global $aktt;
 	$aktt->do_blog_post_tweet($post_id);
@@ -999,6 +1017,11 @@ function aktt_request_handler() {
 			case 'aktt_reset_tweet_checking':
 				aktt_reset_tweet_checking();
 				wp_redirect(get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&tweet-checking-reset=true');
+				die();
+				break;
+			case 'aktt_reset_tweet_checking':
+				aktt_reset_digests();
+				wp_redirect(get_bloginfo('wpurl').'/wp-admin/options-general.php?page=twitter-tools.php&digest-reset=true');
 				die();
 				break;
 			case 'aktt_js':
@@ -1573,6 +1596,10 @@ function aktt_options_form() {
 							<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
 						</div>
 						<div class="option">
+							<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
+							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.$aktt->tweet_prefix.'" />
+						</div>
+						<div class="option">
 							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
 							<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for posting via XML-RPC', 'twitter-tools').'</span>
 						</div>
@@ -1644,12 +1671,13 @@ function aktt_options_form() {
 						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
 					</p>
 				</form>
-				<h2>'.__('Update Tweets', 'twitter-tools').'</h2>
+				<h2>'.__('Update Tweets / Reset Checking and Digests', 'twitter-tools').'</h2>
 				<form name="ak_twittertools_updatetweets" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="get">
-					<p>'.__('Use this button to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
+					<p>'.__('Use these buttons to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
 					<p class="submit">
 						<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
-						<input type="submit" name="reset-button" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
+						<input type="submit" name="reset-button-1" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
+						<input type="submit" name="reset-button-2" value="'.__('Reset Digests', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_digests\';" />
 						<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
 					</p>
 				</form>
