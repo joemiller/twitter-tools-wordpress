@@ -203,7 +203,10 @@ class twitter_tools {
 
 	function get_settings() {
 		foreach ($this->options as $option) {
-			$this->$option = get_option('aktt_'.$option);
+			$value = get_option('aktt_'.$option);
+			if ($option != 'tweet_prefix' || !empty($value)) {
+				$this->$option = $value;
+			}
 		}
 		$this->tweet_format = $this->tweet_prefix.': %s %s';
 	}
