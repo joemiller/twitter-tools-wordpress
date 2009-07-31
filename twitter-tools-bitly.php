@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools - Bit.ly URLs 
 Plugin URI: http://crowdfavorite.com/wordpress/ 
 Description: Use Bit.ly for URL shortening with Twitter Tools. This plugin relies on Twitter Tools, configure it on the Twitter Tools settings page.
-Version: 1.0 
+Version: 2.0 
 Author: Crowd Favorite
 Author URI: http://crowdfavorite.com
 */

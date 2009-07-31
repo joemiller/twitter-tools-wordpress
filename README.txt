@@ -1,8 +1,8 @@
 === Twitter Tools ===
 Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, widget
-Contributors: alexkingorg
+Contributors: alexkingorg. crowdfavorite
 Requires at least: 2.3
-Tested up to: 2.7.1
+Tested up to: 2.8.2
 Stable tag: 1.6
 
 Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
@@ -161,9 +161,9 @@ Allows you to add to the Twitter Tools box on the New Post page (requires the op
 
 == Known Issues ==
 
+* If you change your blog post notification tweet prefix, the previous blog post notification might not be correctly recognized as a blog post tweet. This is only under very rare conditions due to timing issues.
 * Only one Twitter account is supported (not one account per author).
 * Tweets are not deleted from the tweet table in your WordPress database when they are deleted from Twitter. To delete from your WordPress database, use a database admin tool like phpMyAdmin.
-* The relative date function isn't fully localized.
 
 
 == Frequently Asked Questions ==
@@ -180,6 +180,8 @@ Actually, Twitter Tools has taken this into account and you can safely enable bo
 
 No, Twitter Tools sends your long URL to Twitter and Twitter chooses to shorten it or not.
 
+As of version 2.0 a plugin to do this with the Bit.ly service is included as an option.
+
 = Can Twitter Tools use a URL shortening service? =
 
 Yes, Twitter Tools includes a filter:
@@ -188,15 +190,11 @@ Yes, Twitter Tools includes a filter:
 
 as of version 1.6. Plugins for this filter may already exist, or you can create your own. The plugin needs to attach to this filter using the standard WordPress `add_filter()` function and return a URL that will then be passed with your blog post tweet.
 
+As of version 2.0 a plugin to do this with the Bit.ly service is included as an option.
+
 = Is there any way to change the 'New Blog Post:' prefix when my new posts get tweeted? =
 
-Yes there is, but you have to change the code in the plugin file. 
-
-The reason this is done this way, and not as an easily changeable option from the admin screen, is so that the plugin correctly identifies the tweets that originated from previous blog posts when creating the digest posts, displaying the latest tweet, displaying sidebar tweets, and creating blog posts from tweets (you don't want tweets that are blog post notifications being treated like tweets that originated on Twitter).
-
-To make the change, look for and modify the following line: 
-
-`$this->tweet_prefix = 'New blog post';`
+Yes, as of version 2.0 you can change this on the Options page.
 
 = Can I remove the 'New Blog Post:' prefix entirely? =
 
@@ -208,6 +206,7 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 = 2.0 =
 
 * Added various hooks and filters to enable other plugins to interact with Twitter Tools.
+* Added option to set blog post tweet prefix
 * Initial release of Bit.ly for Twitter Tools - enables shortening your URLs and tracking them on your Bit.ly account.
 * Initial release of #hashtags for Twitter Tools - enables adding hashtags to your blog post tweets.
 * Initial release of Exclude Category for Twitter Tools - enables not tweeting posts in chosen categories.

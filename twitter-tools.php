@@ -2,8 +2,8 @@
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
-Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter.
-Version: 2.0dev
+Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
+Version: 2.0rc1
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -205,13 +205,15 @@ class twitter_tools {
 		foreach ($this->options as $option) {
 			$this->$option = get_option('aktt_'.$option);
 		}
+		$this->tweet_format = $this->tweet_prefix.': %s %s';
 	}
 	
 	// puts post fields into object propps
 	function populate_settings() {
 		foreach ($this->options as $option) {
-			if (isset($_POST['aktt_'.$option])) {
-				$this->$option = stripslashes($_POST['aktt_'.$option]);
+			$value = stripslashes($_POST['aktt_'.$option]);
+			if (isset($_POST['aktt_'.$option]) && ($option != 'tweet_prefix' || !empty($value))) {
+				$this->$option = $value;
 			}
 		}
 	}
@@ -705,11 +707,9 @@ function aktt_update_tweets() {
 				// make sure we haven't downloaded someone else's tweets - happens sometimes due to Twitter hiccups
 				if (strtolower($tw_data->user->screen_name) == strtolower($aktt->twitter_username)) {
 					$new_tweets[] = $tweet;
+					$tweet->add();
 				}
 			}
-		}
-		foreach ($new_tweets as $tweet) {
-			$tweet->add();
 		}
 	}
 	aktt_reset_tweet_checking($hash, time());
@@ -1597,7 +1597,7 @@ function aktt_options_form() {
 						</div>
 						<div class="option">
 							<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.$aktt->tweet_prefix.'" />
+							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.$aktt->tweet_prefix.'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
 							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
@@ -1719,7 +1719,7 @@ function aktt_post_options() {
 			$no = '';
 		}
 		echo '
-		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">'._('Yes', 'twitter-tools').'</label> &nbsp;&nbsp;
+		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">'.__('Yes', 'twitter-tools').'</label> &nbsp;&nbsp;
 		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_no" value="no" '.$no.' /> <label for="aktt_notify_twitter_no">'.__('No', 'twitter-tools').'</label>
 		';
 		echo '
@@ -1792,7 +1792,7 @@ add_action('admin_menu', 'aktt_menu_items');
 
 function aktt_plugin_action_links($links, $file) {
 	$plugin_file = basename(__FILE__);
-	if ($file == $plugin_file) {
+	if (basename($file) == $plugin_file) {
 		$settings_link = '<a href="options-general.php?page='.$plugin_file.'">'.__('Settings', 'twitter-tools').'</a>';
 		array_unshift($links, $settings_link);
 	}
