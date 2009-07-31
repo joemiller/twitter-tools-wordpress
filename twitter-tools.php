@@ -981,7 +981,11 @@ function aktt_init() {
 	}
 	global $wp_version;
 	if (isset($wp_version) && version_compare($wp_version, '2.5', '>=') && empty ($aktt->install_date)) {
-		add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Please update your <a href="%s">Twitter Tools settings</a>', 'popularity-contest'), get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php")."</p></div>';" ) );
+		add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Please update your <a href="%s">Twitter Tools settings</a>', 'twitter-tools'), get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php")."</p></div>';" ) );
+	}
+	if (!get_option('aktt_tweet_prefix')) {
+		update_option('aktt_tweet_prefix', $aktt->tweet_prefix);
+		add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Please update your <a href="%s">Twitter Tools settings</a>', 'twitter-tools'), get_bloginfo('wpurl')."/wp-admin/options-general.php?page=twitter-tools.php")."</p></div>';" ) );
 	}
 }
 add_action('init', 'aktt_init');
@@ -1582,7 +1586,6 @@ function aktt_options_form() {
 			<div class="wrap" id="aktt_options_page">
 				<h2>'.__('Twitter Tools Options', 'twitter-tools').'</h2>
 				<form id="ak_twittertools" name="ak_twittertools" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="post">
-					<input type="hidden" name="ak_action" value="aktt_update_settings" />
 					<fieldset class="options">
 						<div class="option">
 							<label for="aktt_twitter_username">'.__('Twitter Username', 'twitter-tools').'/'.__('Password', 'twitter-tools').'</label>
@@ -1670,6 +1673,7 @@ function aktt_options_form() {
 					<p class="submit">
 						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
 					</p>
+					<input type="hidden" name="ak_action" value="aktt_update_settings" class="hidden" style="display: none;" />
 				</form>
 				<h2>'.__('Update Tweets / Reset Checking and Digests', 'twitter-tools').'</h2>
 				<form name="ak_twittertools_updatetweets" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="get">
