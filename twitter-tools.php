@@ -972,7 +972,7 @@ function aktt_init() {
 		add_action('shutdown', 'aktt_update_tweets');
 		add_action('shutdown', 'aktt_ping_digests');
 	}
-	if (is_admin() || $aktt->tweet_from_sidebar) {
+	if (is_admin() || ($aktt->tweet_from_sidebar && current_user_can('publish_posts'))) {
 		switch ($aktt->js_lib) {
 			case 'jquery':
 				wp_enqueue_script('jquery');
