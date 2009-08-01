@@ -472,7 +472,7 @@ class twitter_tools {
 		}
 		$tweet = new aktt_tweet;
 		$url = apply_filters('tweet_blog_post_url', get_permalink($post_id));
-		$tweet->tw_text = sprintf(__($this->tweet_format, 'twitter-tools'), html_entity_decode($post->post_title, ENT_COMPAT, 'UTF-8'), $url);
+		$tweet->tw_text = sprintf(__($this->tweet_format, 'twitter-tools'), @html_entity_decode($post->post_title, ENT_COMPAT, 'UTF-8'), $url);
 		$tweet = apply_filters('aktt_do_blog_post_tweet', $tweet, $post); // return false here to not tweet
 		if (!$tweet) {
 			return;
