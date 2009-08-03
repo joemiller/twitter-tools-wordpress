@@ -2,8 +2,8 @@
 Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, widget
 Contributors: alexkingorg. crowdfavorite
 Requires at least: 2.3
-Tested up to: 2.8.2
-Stable tag: 1.6
+Tested up to: 2.8.3
+Stable tag: 2.0
 
 Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
 
@@ -207,6 +207,7 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 
 * Added various hooks and filters to enable other plugins to interact with Twitter Tools.
 * Added option to set blog post tweet prefix
+* Added CSS classes for elements in tweet list
 * Initial release of Bit.ly for Twitter Tools - enables shortening your URLs and tracking them on your Bit.ly account.
 * Initial release of #hashtags for Twitter Tools - enables adding hashtags to your blog post tweets.
 * Initial release of Exclude Category for Twitter Tools - enables not tweeting posts in chosen categories.
