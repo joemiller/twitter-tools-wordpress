@@ -591,7 +591,7 @@ function aktt_profile_url($username) {
 }
 
 function aktt_profile_link($username, $prefix = '', $suffix = '') {
-	return $prefix.'<a href="'.aktt_profile_url($username).'">'.$username.'</a>'.$suffix;
+	return $prefix.'<a href="'.aktt_profile_url($username).'" class="aktt_username">'.$username.'</a>'.$suffix;
 }
 
 function aktt_hashtag_url($hashtag) {
@@ -600,7 +600,7 @@ function aktt_hashtag_url($hashtag) {
 }
 
 function aktt_hashtag_link($hashtag, $prefix = '', $suffix = '') {
-	return $prefix.'<a href="'.aktt_hashtag_url($hashtag).'">'.htmlspecialchars($hashtag).'</a>'.$suffix;
+	return $prefix.'<a href="'.aktt_hashtag_url($hashtag).'" class="aktt_hashtag">'.htmlspecialchars($hashtag).'</a>'.$suffix;
 }
 
 function aktt_status_url($username, $status) {
@@ -808,7 +808,7 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 	global $aktt;
 	$output = aktt_make_clickable(wp_specialchars($tweet->tw_text));
 	if (!empty($tweet->tw_reply_username)) {
-		$output .= 	' <a href="'.aktt_status_url($tweet->tw_reply_username, $tweet->tw_reply_tweet).'">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
+		$output .= 	' <a href="'.aktt_status_url($tweet->tw_reply_username, $tweet->tw_reply_tweet).'" class="aktt_tweet_reply">'.sprintf(__('in reply to %s', 'twitter-tools'), $tweet->tw_reply_username).'</a>';
 	}
 	switch ($time) {
 		case 'relative':
@@ -818,7 +818,7 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 			$time_display = '#';
 			break;
 	}
-	$output .= ' <a href="'.aktt_status_url($aktt->twitter_username, $tweet->tw_id).'">'.$time_display.'</a>';
+	$output .= ' <a href="'.aktt_status_url($aktt->twitter_username, $tweet->tw_id).'" class="aktt_tweet_time">'.$time_display.'</a>';
 	$output = apply_filters('aktt_tweet_display', $output, $tweet); // allows you to alter the tweet display output
 	return $output;
 }
