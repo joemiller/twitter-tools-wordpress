@@ -27,6 +27,8 @@ Author URI: http://alexking.org
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 // **********************************************************************
 
+define('AKTT_VERSION', '2.0');
+
 load_plugin_textdomain('twitter-tools');
 
 if (!defined('PLUGINDIR')) {
@@ -161,7 +163,7 @@ class twitter_tools {
 		$this->last_tweet_download = '';
 		$this->doing_tweet_download = '0';
 		$this->doing_digest_post = '0';
-		$this->version = '1.6';
+		$this->version = AKTT_VERSION;
 	}
 	
 	function upgrade() {
