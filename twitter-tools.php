@@ -27,6 +27,43 @@ Author URI: http://alexking.org
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 // **********************************************************************
 
+/* TODO
+
+- refactor digests to use WP CRONE
+- shortcode for recent tweets (# of tweets as argument)
+- test this code fix, here and bitly plugin (Porter Maus)
+
+$test = 'this is a test http://alexking.org/blog/2009/07/31/twitter-tools-2-0rc1 and this is some more testing. ooh and look anuther url http://alexking.org/blog/2009/07/31/twitter-tools-2-0rc1 and hers a difrent one http://us.php.net/preg_match';
+echo "<p>test: ". $test ."</p>\n";
+
+//! This next line is from your code
+//preg_match_all('@(https?://([-\w\.]+)+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?)@', $test, $urls);
+preg_match_all('$\b(https?|ftp|file)://[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|]$i', $test, $urls);
+
+if (isset($urls[0]) && count($urls[0])) {
+	foreach ($urls[0] as $url) {
+	// borrowed from WordPress's make_clickable code
+		if ( in_array(substr($url, -1), array('.', ',', ';', ':', ')')) === true ) {
+			$url = substr($url, 0, strlen($url)-1);
+		}
+		//$tweet->tw_text = str_replace($url, aktt_bitly_shorten_url($url), $tweet->tw_text);
+		echo "<p>URL: ". $url ."</p>\n";
+	}
+}
+- po fix?
+
+I found just one "error" in it - it is impossible to translate plugin with mo/po files. It is caused by wordpress's bad implementation of load_plugin_textdomain. When I create translation, it is ignored by WP. Fortunately the solution is very simple: 
+replace line 30 in twitter-tools.php:
+load_plugin_textdomain('twitter-tools');
+with following code:
+load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/language');
+and then simply put translation into subdirectory "language" under twitter-tools. (yes, it is possible to put it into the plugin directory and use load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/'); - but it looks unprofessional :))
+
+- different class names for time, reply to, tweet links in list of tweets (sidebar and digest)
+- use admin_url() for admin links/form posts
+
+*/
+
 define('AKTT_VERSION', '2.0');
 
 load_plugin_textdomain('twitter-tools');
