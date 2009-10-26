@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
@@ -791,7 +791,7 @@ function aktt_sidebar_tweets() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
-		WHERE tw_text NOT LIKE '$aktt->tweet_prefix%'
+		WHERE tw_text NOT LIKE '".$wpdb->escape($aktt->tweet_prefix)."%'
 		$where
 		GROUP BY tw_id
 		ORDER BY tw_created_at DESC
