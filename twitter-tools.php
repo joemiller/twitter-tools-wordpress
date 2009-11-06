@@ -50,6 +50,16 @@ if (isset($urls[0]) && count($urls[0])) {
 		echo "<p>URL: ". $url ."</p>\n";
 	}
 }
+
+--- Alternate implementation
+
+I added "\-" at column 69 in that line, changing it from:
+               preg_match_all('@(https?://([-\w\.]+)+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?)@', $tweet-&gt;tw_text, $urls);
+
+to this:
+               preg_match_all('@(https?://([-\w\.]+)+(:\d+)?(/([\w/\-_\.]*(\?\S+)?)?)?)@', $tweet-&gt;tw_text, $urls);
+
+
 - po fix?
 
 I found just one "error" in it - it is impossible to translate plugin with mo/po files. It is caused by wordpress's bad implementation of load_plugin_textdomain. When I create translation, it is ignored by WP. Fortunately the solution is very simple: 
