@@ -71,6 +71,7 @@ and then simply put translation into subdirectory "language" under twitter-tools
 
 - different class names for time, reply to, tweet links in list of tweets (sidebar and digest)
 - use admin_url() for admin links/form posts
+- should aktt_latest_tweet() respect the "omit replies" setting? another option?
 
 */
 
