@@ -61,14 +61,8 @@ function aktt_bitly_shorten_tweet($tweet) {
 add_filter('aktt_do_tweet', 'aktt_bitly_shorten_tweet');
 
 function aktt_bitly_request_handler() {
-	if (!empty($_GET['cf_action'])) {
-		switch ($_GET['cf_action']) {
-
-		}
-	}
 	if (!empty($_POST['cf_action'])) {
 		switch ($_POST['cf_action']) {
-
 			case 'aktt_bitly_update_settings':
 				aktt_bitly_save_settings();
 				wp_redirect(trailingslashit(get_bloginfo('wpurl')).'wp-admin/options-general.php?page=twitter-tools.php&updated=true');

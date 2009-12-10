@@ -73,9 +73,6 @@ Author URI: http://alexking.org
 - different class names for time, reply to, tweet links in list of tweets (sidebar and digest)
 - use admin_url() for admin links/form posts
 - should aktt_latest_tweet() respect the "omit replies" setting? another option?
-- regex for hashtags is poor, only links 15 chars and requires a leading space
-	-               '/\ #([a-zA-Z0-9_]{1,15})/'
-	+               '/#([a-zA-Z0-9_])*/'
 
 
 */
@@ -679,9 +676,10 @@ function aktt_login_test($username, $password) {
 	$snoop->user = $username;
 	$snoop->pass = $password;
 	$snoop->fetch(AKTT_API_USER_TIMELINE);
-	if (strpos($snoop->response_code, '200')) {
+	if (strpos($snoop->response_code, '200') !== false) {
 		return __("Login succeeded, you're good to go.", 'twitter-tools');
-	} else {
+	}
+	else {
 		$json = new Services_JSON();
 		$results = $json->decode($snoop->results);
 		return sprintf(__('Sorry, login failed. Error message from Twitter: %s', 'twitter-tools'), $results->error);
@@ -728,12 +726,13 @@ function aktt_update_tweets() {
 	if ($hash == get_option('aktt_update_hash')) {
 		update_option('aktt_last_tweet_download', time());
 		update_option('aktt_doing_tweet_download', '0');
+		do_action('aktt_update_tweets');
 		return;
 	}
 	$json = new Services_JSON();
 	$tweets = $json->decode($data);
 
-	if (is_array($tweets) && count($tweets) > 0) {
+	if (is_array($tweets) && count($tweets)) {
 		$tweet_ids = array();
 		foreach ($tweets as $tweet) {
 			$tweet_ids[] = $wpdb->escape($tweet->id);
@@ -764,13 +763,13 @@ function aktt_update_tweets() {
 				}
 				// make sure we haven't downloaded someone else's tweets - happens sometimes due to Twitter hiccups
 				if (strtolower($tw_data->user->screen_name) == strtolower($aktt->twitter_username)) {
-					$new_tweets[] = $tweet;
 					$tweet->add();
 				}
 			}
 		}
 	}
 	aktt_reset_tweet_checking($hash, time());
+	do_action('aktt_update_tweets');
 }
 
 
@@ -881,7 +880,7 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 function aktt_make_clickable($tweet) {
 	$tweet .= ' ';
 	$tweet = preg_replace_callback(
-			'/@([a-zA-Z0-9_]{1,15})([) ])/'
+			'/@([a-zA-Z0-9_]{1,20})([) ])/'
 			, create_function(
 				'$matches'
 				, 'return aktt_profile_link($matches[1], \'@\', $matches[2]);'
@@ -889,10 +888,10 @@ function aktt_make_clickable($tweet) {
 			, $tweet
 	);
 	$tweet = preg_replace_callback(
-		'/\ #([a-zA-Z0-9_]{1,15})/'
+		'/(^|\ )#([a-zA-Z0-9_])/'
 		, create_function(
 			'$matches'
-			, 'return aktt_hashtag_link($matches[1], \' #\', \'\');'
+			, 'return aktt_hashtag_link($matches[2], \' #\', \'\');'
 		)
 		, $tweet
 	);
