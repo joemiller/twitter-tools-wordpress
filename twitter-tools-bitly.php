@@ -45,7 +45,7 @@ add_filter('tweet_blog_post_url', 'aktt_bitly_shorten_url');
 
 function aktt_bitly_shorten_tweet($tweet) {
 	if (strpos($tweet->tw_text, 'http') !== false) {
-		preg_match_all('@(https?://([-\w\.]+)+(:\d+)?(/([\w/_\.]*(\?\S+)?)?)?)@', $tweet->tw_text, $urls);
+		preg_match_all('@(https?://([-\w\.]+)+(:\d+)?(/([\w/_\.-]*(\?\S+)?)?)?)@', $tweet->tw_text, $urls);
 		if (isset($urls[0]) && count($urls[0])) {
 			foreach ($urls[0] as $url) {
 // borrowed from WordPress's make_clickable code
