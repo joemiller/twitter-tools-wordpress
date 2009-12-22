@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /*
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
