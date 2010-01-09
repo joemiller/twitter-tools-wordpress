@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools - Bit.ly URLs 
 Plugin URI: http://crowdfavorite.com/wordpress/ 
 Description: Use Bit.ly for URL shortening with Twitter Tools. This plugin relies on Twitter Tools, configure it on the Twitter Tools settings page.
-Version: 2.1dev 
+Version: 2.1 
 Author: Crowd Favorite
 Author URI: http://crowdfavorite.com
 */
@@ -12,8 +12,6 @@ Author URI: http://crowdfavorite.com
 
 // ini_set('display_errors', '1'); ini_set('error_reporting', E_ALL);
 
-// TODO - option for j.mp vs. bit.ly URLs
-
 if (!defined('PLUGINDIR')) {
 	define('PLUGINDIR','wp-content/plugins');
 }
@@ -21,13 +19,18 @@ if (!defined('PLUGINDIR')) {
 load_plugin_textdomain('twitter-tools-bitly');
 
 define('AKTT_BITLY_API_SHORTEN_URL', 'http://api.bit.ly/shorten');
+define('AKTT_BITLY_API_SHORTEN_URL_JMP', 'http://api.j.mp/shorten');
 define('AKTT_BITLY_API_VERSION', '2.0.1');
 
 function aktt_bitly_shorten_url($url) {
 	$parts = parse_url($url);
-	if ($parts['host'] != 'bit.ly') {
+	if (!in_array($parts['host'], array('j.mp', 'bit.ly'))) {
 		$snoop = get_snoopy();
-		$api = AKTT_BITLY_API_SHORTEN_URL.'?version='.AKTT_BITLY_API_VERSION.'&longUrl='.urlencode($url);
+		$api_urls = array(
+			'bitly' => AKTT_BITLY_API_SHORTEN_URL,
+			'jmp' => AKTT_BITLY_API_SHORTEN_URL_JMP,
+		);
+		$api = $api_urls[aktt_bitly_setting('aktt_bitly_api_url')].'?version='.AKTT_BITLY_API_VERSION.'&longUrl='.urlencode($url);
 		$login = get_option('aktt_bitly_api_login');
 		$key = get_option('aktt_bitly_api_key');
 		if (!empty($login) && !empty($key)) {
@@ -87,6 +90,16 @@ $aktt_bitly_settings = array(
 		'default' => '',
 		'help' => '',
 	),
+	'aktt_bitly_api_url' => array(
+		'type' => 'select',
+		'label' => __('URL to use', 'twitter-tools-bitly'),
+		'default' => 'bitly',
+		'options' => array(
+			'bitly' => 'bit.ly',
+			'jmp' => 'j.mp',
+		),
+		'help' => '',
+	),
 );
 
 function aktt_bitly_setting($option) {
@@ -134,7 +147,7 @@ function aktt_bitly_settings_form() {
 	print('
 <div class="wrap">
 	<h2>'.__('Bit.ly for Twitter Tools', 'twitter-tools-bitly').'</h2>
-	<form id="aktt_bitly_settings_form" name="aktt_bitly_settings_form" action="'.admin_url('options-general.php').'" method="post">
+	<form id="aktt_bitly_settings_form" class="aktt" name="aktt_bitly_settings_form" action="'.admin_url('options-general.php').'" method="post">
 		<input type="hidden" name="cf_action" value="aktt_bitly_update_settings" />
 		<fieldset class="options">
 	');

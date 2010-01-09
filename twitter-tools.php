@@ -29,6 +29,7 @@ Author URI: http://alexking.org
 
 /* TODO
 
+- update widget to new WP widget class
 - what should retweet support look like?
 - refactor digests to use WP-CRON
 
@@ -1416,15 +1417,18 @@ function akttTestLoginResult() {
 	height: 300px;
 	width: 95%;
 }
+form.aktt .options,
 #ak_twittertools .options {
 	overflow: hidden;
 	border: none;
 }
+form.aktt .option,
 #ak_twittertools .option {
 	overflow: hidden;
 	padding-bottom: 9px;
 	padding-top: 9px;
 }
+form.aktt .option label,
 #ak_twittertools .option label {
 	display: block;
 	float: left;
@@ -1432,25 +1436,26 @@ function akttTestLoginResult() {
 	margin-right: 24px;
 	text-align: right;
 }
+form.aktt .option span,
 #ak_twittertools .option span {
+	color: #666;
 	display: block;
 	float: left;
 	margin-left: 230px;
 	margin-top: 6px;
 	clear: left;
 }
+form.aktt select,
+form.aktt input,
 #ak_twittertools select,
 #ak_twittertools input {
 	float: left;
 	display: block;
 	margin-right: 6px;
 }
+form.aktt p.submit,
 #ak_twittertools p.submit {
 	overflow: hidden;
-}
-#ak_twittertools .option span {
-	color: #666;
-	display: block;
 }
 #ak_twittertools #aktt_login_test_result {
 	display: inline;
@@ -1780,13 +1785,9 @@ var WPHC_WP_VERSION = '<?php global $wp_version; echo $wp_version; ?>';
 	');
 }
 
-function aktt_post_options() {
+function aktt_meta_box() {
 	global $aktt, $post;
 	if ($aktt->notify_twitter) {
-		echo '<div class="postbox">
-			<h3>'.__('Twitter Tools', 'twitter-tools').'</h3>
-			<div class="inside">
-			<p>'.__('Notify Twitter about this post?', 'twitter-tools');
 		$notify = get_post_meta($post->ID, 'aktt_notify_twitter', true);
 		if ($notify == '') {
 			switch ($aktt->notify_twitter_default) {
@@ -1798,29 +1799,22 @@ function aktt_post_options() {
 					break;
 			}
 		}
-		if ($notify == 'no') {
-			$yes = '';
-			$no = 'checked="checked"';
-		}
-		else {
-			$yes = 'checked="checked"';
-			$no = '';
-		}
 		echo '
-		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.$yes.' /> <label for="aktt_notify_twitter_yes">'.__('Yes', 'twitter-tools').'</label> &nbsp;&nbsp;
-		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_no" value="no" '.$no.' /> <label for="aktt_notify_twitter_no">'.__('No', 'twitter-tools').'</label>
+			<p>'.__('Send post to Twitter?', 'twitter-tools').'
+		&nbsp;
+		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_yes" value="yes" '.checked('yes', $notify, false).' /> <label for="aktt_notify_twitter_yes">'.__('Yes', 'twitter-tools').'</label> &nbsp;&nbsp;
+		<input type="radio" name="aktt_notify_twitter" id="aktt_notify_twitter_no" value="no" '.checked('no', $notify, false).' /> <label for="aktt_notify_twitter_no">'.__('No', 'twitter-tools').'</label>
 		';
 		echo '
 			</p>
 		';
 		do_action('aktt_post_options');
-		echo '
-			</div><!--.inside-->
-			</div><!--.postbox-->
-		';
 	}
 }
-add_action('edit_form_advanced', 'aktt_post_options');
+function aktt_add_meta_box() {
+	add_meta_box('aktt_post_form', __('Twitter Tools', 'twitter-tools'), 'aktt_meta_box', 'post', 'side');
+}
+add_action('admin_init', 'aktt_add_meta_box');
 
 function aktt_store_post_options($post_id, $post = false) {
 	global $aktt;
