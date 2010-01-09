@@ -8,6 +8,8 @@ Author: Crowd Favorite
 Author URI: http://crowdfavorite.com
 */
 
+// Thanks to Porter Maus for his contributions.
+
 // ini_set('display_errors', '1'); ini_set('error_reporting', E_ALL);
 
 // TODO - option for j.mp vs. bit.ly URLs
@@ -25,7 +27,6 @@ function aktt_bitly_shorten_url($url) {
 	$parts = parse_url($url);
 	if ($parts['host'] != 'bit.ly') {
 		$snoop = get_snoopy();
-		$json = new Services_JSON();
 		$api = AKTT_BITLY_API_SHORTEN_URL.'?version='.AKTT_BITLY_API_VERSION.'&longUrl='.urlencode($url);
 		$login = get_option('aktt_bitly_api_login');
 		$key = get_option('aktt_bitly_api_key');
@@ -34,7 +35,7 @@ function aktt_bitly_shorten_url($url) {
 		}
 		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
 		$snoop->fetch($api);
-		$result = $json->decode($snoop->results);
+		$result = json_decode($snoop->results);
 		if (!empty($result->results->{$url}->shortUrl)) {
 			$url = $result->results->{$url}->shortUrl;
 		}
@@ -45,7 +46,7 @@ add_filter('tweet_blog_post_url', 'aktt_bitly_shorten_url');
 
 function aktt_bitly_shorten_tweet($tweet) {
 	if (strpos($tweet->tw_text, 'http') !== false) {
-		preg_match_all('@(https?://([-\w\.]+)+(:\d+)?(/([\w/_\.-]*(\?\S+)?)?)?)@', $tweet->tw_text, $urls);
+		preg_match_all('$\b(https?|ftp|file)://[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|]$i', $test, $urls);
 		if (isset($urls[0]) && count($urls[0])) {
 			foreach ($urls[0] as $url) {
 // borrowed from WordPress's make_clickable code
@@ -65,7 +66,7 @@ function aktt_bitly_request_handler() {
 		switch ($_POST['cf_action']) {
 			case 'aktt_bitly_update_settings':
 				aktt_bitly_save_settings();
-				wp_redirect(trailingslashit(get_bloginfo('wpurl')).'wp-admin/options-general.php?page=twitter-tools.php&updated=true');
+				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&updated=true'));
 				die();
 				break;
 		}
@@ -133,7 +134,7 @@ function aktt_bitly_settings_form() {
 	print('
 <div class="wrap">
 	<h2>'.__('Bit.ly for Twitter Tools', 'twitter-tools-bitly').'</h2>
-	<form id="aktt_bitly_settings_form" name="aktt_bitly_settings_form" action="'.get_bloginfo('wpurl').'/wp-admin/options-general.php" method="post">
+	<form id="aktt_bitly_settings_form" name="aktt_bitly_settings_form" action="'.admin_url('options-general.php').'" method="post">
 		<input type="hidden" name="cf_action" value="aktt_bitly_update_settings" />
 		<fieldset class="options">
 	');

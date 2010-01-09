@@ -39,6 +39,17 @@ There are a number of configuration options for Twitter Tools. You can find thes
 If you are using widgets, you can drag Twitter Tools to your sidebar to display your latest tweets.
 
 
+= Shortcode =
+
+Use:
+
+`[aktt_tweets]`
+
+to show your latest tweets. This will show the number of tweets set in your Settings. If you want to control how many tweets are shown explicitly, you can do so by adding a 'count' parameter like this:
+
+`[aktt_tweets count=5]`
+
+
 = Template Tags =
 
 If you are not using widgest, you can use a template tag to add your latest tweets to your sidebar.
