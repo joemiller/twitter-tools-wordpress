@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
-Version: 2.1dev
+Version: 2.1
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -29,25 +29,14 @@ Author URI: http://alexking.org
 
 /* TODO
 
-- add shortcode to README
-
 - what should retweet support look like?
 - refactor digests to use WP-CRON
-
-- po fix?
-
-	I found just one "error" in it - it is impossible to translate plugin with mo/po files. It is caused by wordpress's bad implementation of load_plugin_textdomain. When I create translation, it is ignored by WP. Fortunately the solution is very simple: 
-	replace line 30 in twitter-tools.php:
-	load_plugin_textdomain('twitter-tools');
-	with following code:
-	load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/language');
-	and then simply put translation into subdirectory "language" under twitter-tools. (yes, it is possible to put it into the plugin directory and use load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/'); - but it looks unprofessional :))
 
 */
 
 define('AKTT_VERSION', '2.1');
 
-load_plugin_textdomain('twitter-tools');
+load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/language');
 
 if (!defined('PLUGINDIR')) {
 	define('PLUGINDIR','wp-content/plugins');
