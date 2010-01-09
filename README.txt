@@ -3,7 +3,7 @@ Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, wid
 Contributors: alexkingorg. crowdfavorite
 Requires at least: 2.6
 Tested up to: 2.9.1
-Stable tag: 2.0
+Stable tag: 2.1
 
 Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
 
@@ -237,6 +237,7 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 * Change how Services_JSON is included to be compatible with changes in WP 2.9 and PHP < 5.2
 * Digest functionality is marked as experimental, they need to be fundamentally rewritten to avoid race conditions experienced by some users 
 * Misc code cleanup and bug fixes
+* Added language dir and .pot file
 
 Bit.ly plugin
 
