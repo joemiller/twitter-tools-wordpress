@@ -23,9 +23,9 @@ Twitter Tools integrates with Twitter by giving you the following functionality:
 == Installation ==
 
 1. Download the plugin archive and expand it (you've likely already done this).
-2. Put the 'twitter-tools.php' file into your wp-content/plugins/ directory.
+2. Put the 'twitter-tools' directory into your wp-content/plugins/ directory.
 3. Go to the Plugins page in your WordPress Administration area and click 'Activate' for Twitter Tools.
-4. Go to the Twitter Tools Options page (Options > Twitter Tools) to set your Twitter account information and preferences.
+4. Go to the Twitter Tools Options page (Settings > Twitter Tools) to set your Twitter account information and preferences.
 
 
 == Configuration ==
@@ -60,6 +60,13 @@ If you are not using widgest, you can use a template tag to add your latest twee
 If you just want your latest tweet, use this template tag.
 
 `<?php aktt_latest_tweet(); ?>`
+
+
+== Plugins ==
+
+Twitter Tools supports plugins, several are included. You can find more here:
+
+http://delicious.com/alexkingorg/twitter-tools+plugin
 
 
 == Hooks/API ==
@@ -218,7 +225,7 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 
 * Make install code a little smarter
 * Add unique index on tweet ID columns, remove duplicates and optimize table
-* Track the currently intalled version for easier upgrades in the future
+* Track the currently installed version for easier upgrades in the future
 * Cleanup around login test code
 * Add action on Update Tweets (aktt_update_tweets)
 * Add a shortcode to display recent tweets
@@ -228,6 +235,7 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 * Added WordPress HelpCenter contact info to settings page
 * Use standard meta boxes (not backwards compatible) for post screen settings
 * Change how Services_JSON is included to be compatible with changes in WP 2.9 and PHP < 5.2
+* Digest functionality is marked as experimental, they need to be fundamentally rewritten to avoid race conditions experienced by some users 
 * Misc code cleanup and bug fixes
 
 Bit.ly plugin

@@ -1475,6 +1475,16 @@ form.aktt p.submit,
 #ak_twittertools .active .daypicker {
 	display: block
 }
+.aktt_experimental {
+	background: #eee;
+	border: 2px solid #ccc;
+}
+.aktt_experimental h4 {
+	color: #666;
+	margin: 0;
+	padding: 10px;
+	text-align: center;
+}
 <?php
 				die();
 				break;
@@ -1685,31 +1695,6 @@ function aktt_options_form() {
 							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
 							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
 						</div>
-						<div class="option time_toggle">
-							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
-							<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.$aktt->digest_daily_time.'" />
-						</div>
-						<div class="option">
-							<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
-							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
-						</div>
-						<div class="option time_toggle">
-							<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
-							<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.$aktt->digest_weekly_time.'" />
-							<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
-						</div>
-						<div class="option">
-							<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.$aktt->digest_title_weekly.'" />
-							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
-							<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
-						</div>
 						<div class="option">
 							<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
 							<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
@@ -1744,6 +1729,38 @@ function aktt_options_form() {
 							<label for="aktt_give_tt_credit">'.__('Give Twitter Tools credit?', 'twitter-tools').'</label>
 							<select name="aktt_give_tt_credit" id="aktt_give_tt_credit">'.$give_tt_credit_options.'</select>
 						</div>
+						
+						<div class="aktt_experimental">
+							<h4>'.__('- Experimental -', 'twitter-tools').'</h4>
+						
+						<div class="option time_toggle">
+							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
+							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
+							<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.$aktt->digest_daily_time.'" />
+						</div>
+						<div class="option">
+							<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
+							<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
+							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+						</div>
+						<div class="option time_toggle">
+							<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
+							<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
+							<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.$aktt->digest_weekly_time.'" />
+							<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
+						</div>
+						<div class="option">
+							<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
+							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.$aktt->digest_title_weekly.'" />
+							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+						</div>
+						<div class="option">
+							<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
+							<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
+						</div>
+						
+						</div>
+						
 					</fieldset>
 					<p class="submit">
 						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
@@ -1752,7 +1769,7 @@ function aktt_options_form() {
 				</form>
 	');
 ?>
-<div style="width: 650px">
+<div style="padding-left: 50px; width: 600px">
 <script type="text/javascript">
 var WPHC_AFF_ID = '14303';
 var WPHC_WP_VERSION = '<?php global $wp_version; echo $wp_version; ?>';
