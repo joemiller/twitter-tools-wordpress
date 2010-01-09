@@ -729,7 +729,6 @@ function aktt_update_tweets() {
 			WHERE tw_id
 			IN ('".implode("', '", $tweet_ids)."')
 		");
-		$new_tweets = array();
 		foreach ($tweets as $tw_data) {
 			if (!$existing_ids || !in_array($tw_data->id, $existing_ids)) {
 				$tweet = new aktt_tweet(

@@ -1,8 +1,8 @@
 === Twitter Tools ===
 Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, widget
 Contributors: alexkingorg. crowdfavorite
-Requires at least: 2.3
-Tested up to: 2.8.3
+Requires at least: 2.6
+Tested up to: 2.9.1
 Stable tag: 2.0
 
 Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
@@ -213,6 +213,39 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 
 
 == Changelog ==
+
+= 2.1 =
+
+* Make install code a little smarter
+* Add unique index on tweet ID columns, remove duplicates and optimize table
+* Track the currently intalled version for easier upgrades in the future
+* Cleanup around login test code
+* Add action on Update Tweets (aktt_update_tweets)
+* Add a shortcode to display recent tweets
+* Exclude replies in aktt_latest_tweet() function (if option selected)
+* Better RegEx for username and hashtag linking
+* Use site_url() and admin_url(), losing backward compatibility but gaining SSL compatibility
+* Added WordPress HelpCenter contact info to settings page
+* Use standard meta boxes (not backwards compatible) for post screen settings
+* Change how Services_JSON is included to be compatible with changes in WP 2.9 and PHP < 5.2
+* Misc code cleanup and bug fixes
+
+Bit.ly plugin
+
+* Changed RegEx for finding URLs in tweet content (thanks Porter Maus)
+* Added a j.mp option
+* Cleaned up the settings form
+* Added a trim() on the API Key for people that struggle with copy/paste
+* Use admin_url(), losing backward compatibility but gaining SSL compatibility
+
+Exclude Category plugin
+
+* Use admin_url(), losing backward compatibility but gaining SSL compatibility
+
+Hashtags plugin
+
+* Use admin_url(), losing backward compatibility but gaining SSL compatibility
+
 
 = 2.0 =
 
