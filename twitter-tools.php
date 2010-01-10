@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
-Version: 2.1
+Version: 2.1.1
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -666,8 +666,7 @@ function aktt_login_test($username, $password) {
 		return __("Login succeeded, you're good to go.", 'twitter-tools');
 	}
 	else {
-		$json = new Services_JSON();
-		$results = $json->decode($snoop->results);
+		$results = json_decode($snoop->results);
 		return sprintf(__('Sorry, login failed. Error message from Twitter: %s', 'twitter-tools'), $results->error);
 	}
 }
@@ -680,6 +679,7 @@ function aktt_ping_digests() {
 
 function aktt_update_tweets() {
 	global $aktt;
+
 	// let the last update run for 10 minutes
 	if (time() - intval(get_option('aktt_doing_tweet_download')) < $aktt->tweet_download_interval()) {
 		return;
@@ -715,8 +715,7 @@ function aktt_update_tweets() {
 		do_action('aktt_update_tweets');
 		return;
 	}
-	$json = new Services_JSON();
-	$tweets = $json->decode($data);
+	$tweets = json_decode($data);
 
 	if (is_array($tweets) && count($tweets)) {
 		$tweet_ids = array();
