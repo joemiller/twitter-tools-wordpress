@@ -84,7 +84,7 @@ function aktt_install() {
 	$aktt_install = new twitter_tools;
 	$wpdb->aktt = $wpdb->prefix.'ak_twitter';
 	$tables = $wpdb->get_col("
-		SHOW TABLES
+		SHOW TABLES LIKE '$wpdb->aktt'
 	");
 	if (!in_array($wpdb->aktt, $tables)) {
 		$charset_collate = '';
