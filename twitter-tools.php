@@ -884,15 +884,15 @@ function aktt_tweet_display($tweet, $time = 'relative') {
 function aktt_make_clickable($tweet) {
 	$tweet .= ' ';
 	$tweet = preg_replace_callback(
-			'/@([a-zA-Z0-9_]{1,})(\s|$)/'
+			'/(^|\s)@([a-zA-Z0-9_]{1,})(\W)/'
 			, create_function(
 				'$matches'
-				, 'return aktt_profile_link($matches[1], \'@\', $matches[2]);'
+				, 'return aktt_profile_link($matches[2], \' @\', $matches[3]);'
 			)
 			, $tweet
 	);
 	$tweet = preg_replace_callback(
-		'/(^|\s)#([a-zA-Z0-9_]{1,})(\s|$)/'
+		'/(^|\s)#([a-zA-Z0-9_]{1,})(\W)/'
 		, create_function(
 			'$matches'
 			, 'return aktt_hashtag_link($matches[2], \' #\', \'\');'
