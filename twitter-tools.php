@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
-Version: 2.2
+Version: 2.2.1
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -1094,7 +1094,7 @@ function aktt_request_handler() {
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweet-checking-reset=true'));
 				die();
 				break;
-			case 'aktt_reset_tweet_checking':
+			case 'aktt_reset_digests':
 				aktt_reset_digests();
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&digest-reset=true'));
 				die();
