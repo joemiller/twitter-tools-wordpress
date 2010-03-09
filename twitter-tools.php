@@ -1146,7 +1146,7 @@ function akttPostTweet() {
 	var tweet_msg = $("aktt_tweet_posted_msg");
 	var akttAjax = new Ajax.Updater(
 		tweet_msg,
-		"<?php echo site_url('index.php'); ?>"
+		"<?php echo site_url('index.php'); ?>",
 		{
 			method: "post",
 			parameters: "ak_action=aktt_post_tweet_sidebar&aktt_tweet_text=" + tweet_text,
