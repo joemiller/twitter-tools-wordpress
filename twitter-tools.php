@@ -389,7 +389,7 @@ class twitter_tools {
 		$conditions = array();
 		$conditions[] = "tw_created_at >= '{$startGMT}'";
 		$conditions[] = "tw_created_at <= '{$endGMT}'";
-		$conditions[] = "tw_text NOT LIKE '$this->tweet_prefix%'";
+		$conditions[] = "tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix%)."'";
 		if ($this->exclude_reply_tweets) {
 			$conditions[] = "tw_text NOT LIKE '@%'";
 		}
@@ -847,7 +847,7 @@ function aktt_latest_tweet() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
-		WHERE tw_text NOT LIKE '$aktt->tweet_prefix%'
+		WHERE tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix%)."'
 		$where
 		ORDER BY tw_created_at DESC
 		LIMIT 1
@@ -1674,8 +1674,8 @@ function aktt_options_form() {
 					<fieldset class="options">
 						<div class="option">
 							<label for="aktt_twitter_username">'.__('Twitter Username', 'twitter-tools').'/'.__('Password', 'twitter-tools').'</label>
-							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.$aktt->twitter_username.'" autocomplete="off" />
-							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.$aktt->twitter_password.'" autocomplete="off" />
+							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.esc_attr($aktt->twitter_username).'" autocomplete="off" />
+							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.esc_attr($aktt->twitter_password).'" autocomplete="off" />
 							<input type="button" class="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
 							<span id="aktt_login_test_result"></span>
 						</div>
@@ -1685,7 +1685,7 @@ function aktt_options_form() {
 						</div>
 						<div class="option">
 							<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.$aktt->tweet_prefix.'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
+							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.esc_attr($aktt->tweet_prefix).'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
 							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
@@ -1701,7 +1701,7 @@ function aktt_options_form() {
 						</div>
 						<div class="option">
 							<label for="aktt_blog_post_tags">'.__('Tag(s) for your tweet posts:', 'twitter-tools').'</label>
-							<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.$aktt->blog_post_tags.'">
+							<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.esc_attr($aktt->blog_post_tags).'">
 							<span>'.__('Separate multiple tags with commas. Example: tweets, twitter', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
@@ -1714,7 +1714,7 @@ function aktt_options_form() {
 						</div>
 						<div class="option">
 							<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
-							<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.$aktt->sidebar_tweet_count.'" />
+							<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.esc_attr($aktt->sidebar_tweet_count).'" />
 							<span>'.__('Numbers only please.', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
@@ -1736,7 +1736,7 @@ function aktt_options_form() {
 						<div class="option time_toggle">
 							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
 							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
-							<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.$aktt->digest_daily_time.'" />
+							<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.esc_attr($aktt->digest_daily_time).'" />
 						</div>
 						<div class="option">
 							<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
@@ -1746,12 +1746,12 @@ function aktt_options_form() {
 						<div class="option time_toggle">
 							<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
 							<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
-							<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.$aktt->digest_weekly_time.'" />
+							<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.esc_attr($aktt->digest_weekly_time).'" />
 							<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
 						</div>
 						<div class="option">
 							<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.$aktt->digest_title_weekly.'" />
+							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.esc_attr($aktt->digest_title_weekly).'" />
 							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
 						</div>
 						<div class="option">
