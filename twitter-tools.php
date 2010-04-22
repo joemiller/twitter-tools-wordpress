@@ -389,7 +389,7 @@ class twitter_tools {
 		$conditions = array();
 		$conditions[] = "tw_created_at >= '{$startGMT}'";
 		$conditions[] = "tw_created_at <= '{$endGMT}'";
-		$conditions[] = "tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix%)."'";
+		$conditions[] = "tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix)."%'";
 		if ($this->exclude_reply_tweets) {
 			$conditions[] = "tw_text NOT LIKE '@%'";
 		}
@@ -847,7 +847,7 @@ function aktt_latest_tweet() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
-		WHERE tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix%)."'
+		WHERE tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix)."%'
 		$where
 		ORDER BY tw_created_at DESC
 		LIMIT 1
@@ -967,6 +967,7 @@ function aktt_tweet_form($type = 'input', $extra = '') {
 		</p>
 		<div class="clear"></div>
 	</fieldset>
+	'.wp_nonce_field('aktt_new_tweet', '_wpnonce', true, false).wp_referer_field(false).'
 </form>
 		';
 	}
@@ -1085,16 +1086,25 @@ function aktt_request_handler() {
 	if (!empty($_GET['ak_action'])) {
 		switch($_GET['ak_action']) {
 			case 'aktt_update_tweets':
+				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
+					wp_die('Oops, please try again.');
+				}
 				aktt_update_tweets();
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweets-updated=true'));
 				die();
 				break;
 			case 'aktt_reset_tweet_checking':
+				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
+					wp_die('Oops, please try again.');
+				}
 				aktt_reset_tweet_checking();
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweet-checking-reset=true'));
 				die();
 				break;
 			case 'aktt_reset_digests':
+				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
+					wp_die('Oops, please try again.');
+				}
 				aktt_reset_digests();
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&digest-reset=true'));
 				die();
@@ -1107,16 +1117,21 @@ function aktt_request_handler() {
 ?>
 function akttPostTweet() {
 	var tweet_field = jQuery('#aktt_tweet_text');
+	var tweet_form = tweet_field.parents('form');
 	var tweet_text = tweet_field.val();
 	if (tweet_text == '') {
 		return;
 	}
 	var tweet_msg = jQuery("#aktt_tweet_posted_msg");
+	var nonce = jQuery(tweet_form).find('input[name=_wpnonce]').val();
+	var refer = jQuery(tweet_form).find('input[name=_wp_http_referer]').val();
 	jQuery.post(
 		"<?php echo site_url('index.php'); ?>",
 		{
 			ak_action: "aktt_post_tweet_sidebar", 
-			aktt_tweet_text: tweet_text
+			aktt_tweet_text: tweet_text,
+			_wpnonce: nonce,
+			_wp_http_referer: refer
 		},
 		function(data) {
 			tweet_msg.html(data);
@@ -1144,12 +1159,14 @@ function akttPostTweet() {
 		return;
 	}
 	var tweet_msg = $("aktt_tweet_posted_msg");
+	var nonce = $('_wpnonce').value;
+	var refer = $('_wpnonce').next('input').value;
 	var akttAjax = new Ajax.Updater(
 		tweet_msg,
 		"<?php echo site_url('index.php'); ?>",
 		{
 			method: "post",
-			parameters: "ak_action=aktt_post_tweet_sidebar&aktt_tweet_text=" + tweet_text,
+			parameters: "ak_action=aktt_post_tweet_sidebar&aktt_tweet_text=" + tweet_text + '&_wpnonce=' + nonce + '&_wp_http_referer=' + refer,
 			onComplete: akttSetReset
 		}
 	);
@@ -1493,6 +1510,9 @@ form.aktt p.submit,
 	if (!empty($_POST['ak_action'])) {
 		switch($_POST['ak_action']) {
 			case 'aktt_update_settings':
+				if (!wp_verify_nonce($_POST['_wpnonce'], 'aktt_settings')) {
+					wp_die('Oops, please try again.');
+				}
 				$aktt->populate_settings();
 				$aktt->update_settings();
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&updated=true'));
@@ -1500,6 +1520,9 @@ form.aktt p.submit,
 				break;
 			case 'aktt_post_tweet_sidebar':
 				if (!empty($_POST['aktt_tweet_text']) && current_user_can('publish_posts')) {
+					if (!wp_verify_nonce($_POST['_wpnonce'], 'aktt_new_tweet')) {
+						wp_die('Oops, please try again.');
+					}
 					$tweet = new aktt_tweet();
 					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
 					if ($aktt->do_tweet($tweet)) {
@@ -1512,6 +1535,9 @@ form.aktt p.submit,
 				break;
 			case 'aktt_post_tweet_admin':
 				if (!empty($_POST['aktt_tweet_text']) && current_user_can('publish_posts')) {
+					if (!wp_verify_nonce($_POST['_wpnonce'], 'aktt_new_tweet')) {
+						wp_die('Oops, please try again.');
+					}
 					$tweet = new aktt_tweet();
 					$tweet->tw_text = stripslashes($_POST['aktt_tweet_text']);
 					if ($aktt->do_tweet($tweet)) {
@@ -1766,6 +1792,7 @@ function aktt_options_form() {
 						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
 					</p>
 					<input type="hidden" name="ak_action" value="aktt_update_settings" class="hidden" style="display: none;" />
+					'.wp_nonce_field('aktt_settings', '_wpnonce', true, false).wp_referer_field(false).'
 				</form>
 	');
 ?>
@@ -1789,6 +1816,7 @@ var WPHC_WP_VERSION = '<?php global $wp_version; echo $wp_version; ?>';
 						<input type="submit" name="reset-button-2" value="'.__('Reset Digests', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_digests\';" />
 						<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
 					</p>
+					'.wp_nonce_field('aktt_update_tweets', '_wpnonce', true, false).wp_referer_field(false).'
 				</form>
 	');
 	do_action('aktt_options_form');
