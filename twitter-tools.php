@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
-Version: 2.2.1
+Version: 2.3
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -1081,36 +1081,10 @@ function aktt_head_admin() {
 }
 add_action('admin_head', 'aktt_head_admin');
 
-function aktt_request_handler() {
-	global $wpdb, $aktt;
+function aktt_resources() {
 	if (!empty($_GET['ak_action'])) {
 		switch($_GET['ak_action']) {
-			case 'aktt_update_tweets':
-				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
-					wp_die('Oops, please try again.');
-				}
-				aktt_update_tweets();
-				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweets-updated=true'));
-				die();
-				break;
-			case 'aktt_reset_tweet_checking':
-				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
-					wp_die('Oops, please try again.');
-				}
-				aktt_reset_tweet_checking();
-				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweet-checking-reset=true'));
-				die();
-				break;
-			case 'aktt_reset_digests':
-				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
-					wp_die('Oops, please try again.');
-				}
-				aktt_reset_digests();
-				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&digest-reset=true'));
-				die();
-				break;
 			case 'aktt_js':
-				remove_action('shutdown', 'aktt_ping_digests');
 				header("Content-type: text/javascript");
 				switch ($aktt->js_lib) {
 					case 'jquery':
@@ -1187,7 +1161,6 @@ function akttReset() {
 				die();
 				break;
 			case 'aktt_css':
-				remove_action('shutdown', 'aktt_ping_digests');
 				header("Content-Type: text/css");
 ?>
 #aktt_tweet_form {
@@ -1218,10 +1191,7 @@ function akttReset() {
 				die();
 				break;
 			case 'aktt_js_admin':
-				remove_action('shutdown', 'aktt_ping_digests');
 				header("Content-Type: text/javascript");
-				switch ($aktt->js_lib) {
-					case 'jquery':
 ?>
 function akttTestLogin() {
 	var result = jQuery('#aktt_login_test_result');
@@ -1380,36 +1350,9 @@ jQuery(function() {
 	
 });
 <?php
-						break;
-					case 'prototype':
-?>
-function akttTestLogin() {
-	var username = $('aktt_twitter_username').value;
-	var password = $('aktt_twitter_password').value;
-	var result = $('aktt_login_test_result');
-	result.className = 'aktt_login_result_wait';
-	result.innerHTML = '<?php _e('Testing...', 'twitter-tools'); ?>';
-	var akttAjax = new Ajax.Updater(
-		result,
-		"<?php echo admin_url('index.php'); ?>",
-		{
-			method: "post",
-			parameters: "ak_action=aktt_login_test&aktt_twitter_username=" + username + "&aktt_twitter_password=" + password,
-			onComplete: akttTestLoginResult
-		}
-	);
-}
-function akttTestLoginResult() {
-	$('aktt_login_test_result').className = 'aktt_login_result';
-	Fat.fade_element('aktt_login_test_result');
-}
-<?php
-						break;
-				}
 				die();
 				break;
 			case 'aktt_css_admin':
-				remove_action('shutdown', 'aktt_ping_digests');
 				header("Content-Type: text/css");
 ?>
 #aktt_tweet_form {
@@ -1503,6 +1446,39 @@ form.aktt p.submit,
 	text-align: center;
 }
 <?php
+				die();
+				break;
+		}
+	}
+}
+add_action('init', 'aktt_resources', 1);
+
+function aktt_request_handler() {
+	global $wpdb, $aktt;
+	if (!empty($_GET['ak_action'])) {
+		switch($_GET['ak_action']) {
+			case 'aktt_update_tweets':
+				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
+					wp_die('Oops, please try again.');
+				}
+				aktt_update_tweets();
+				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweets-updated=true'));
+				die();
+				break;
+			case 'aktt_reset_tweet_checking':
+				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
+					wp_die('Oops, please try again.');
+				}
+				aktt_reset_tweet_checking();
+				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&tweet-checking-reset=true'));
+				die();
+				break;
+			case 'aktt_reset_digests':
+				if (!wp_verify_nonce($_GET['_wpnonce'], 'aktt_update_tweets')) {
+					wp_die('Oops, please try again.');
+				}
+				aktt_reset_digests();
+				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&digest-reset=true'));
 				die();
 				break;
 		}
