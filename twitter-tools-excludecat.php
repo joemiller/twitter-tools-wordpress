@@ -20,6 +20,9 @@ function aktt_excludecat_request_handler() {
 	if (!empty($_POST['cf_action'])) {
 		switch ($_POST['cf_action']) {
 			case 'aktt_excludecat_update_settings':
+				if (!wp_verify_nonce($_POST['_wpnonce'], 'aktt_excludecat_update_settings')) {
+					wp_die('Oops, please try again.');
+				}
 				aktt_excludecat_save_settings();
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&updated=true'));
 				die();
@@ -99,6 +102,7 @@ jQuery(function() {
 		<p class="submit">
 			<input type="submit" name="submit" value="'.__('Save Settings', 'twitter-tools-excludecat').'" class="button-primary" />
 		</p>
+		'.wp_nonce_field('aktt_excludecat_update_settings', '_wpnonce', true, false).wp_referer_field(false).'
 	</form>
 </div>
 	');
