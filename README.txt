@@ -221,6 +221,10 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 
 == Changelog ==
 
+= 2.3.1 =
+
+* Fixed a typo that was breaking the latest tweet template tag.
+
 = 2.3 =
 
 * Added nonces

@@ -847,7 +847,7 @@ function aktt_latest_tweet() {
 	$tweets = $wpdb->get_results("
 		SELECT *
 		FROM $wpdb->aktt
-		WHERE tw_text NOT LIKE '".$wpdb->escape($this->tweet_prefix)."%'
+		WHERE tw_text NOT LIKE '".$wpdb->escape($aktt->tweet_prefix)."%'
 		$where
 		ORDER BY tw_created_at DESC
 		LIMIT 1
