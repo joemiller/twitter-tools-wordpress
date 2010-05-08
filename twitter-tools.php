@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools
 Plugin URI: http://alexking.org/projects/wordpress
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
-Version: 2.3.1
+Version: 2.3.2dev
 Author: Alex King
 Author URI: http://alexking.org
 */
@@ -1584,22 +1584,25 @@ function aktt_options_form() {
 		$cat_options .= "\n\t<option value='$cat_id' $selected>$cat_name</option>";
 	}
 
-	$authors = get_users_of_blog();
+	global $current_user;
+	$authors = get_editable_user_ids($current_user->ID);
 	$author_options = '';
-	foreach ($authors as $user) {
-		$usero = new WP_User($user->user_id);
-		$author = $usero->data;
-		// Only list users who are allowed to publish
-		if (! $usero->has_cap('publish_posts')) {
-			continue;
+	if (count($authors)) {
+		foreach ($authors as $user_id) {
+			$usero = new WP_User($user_id);
+			$author = $usero->data;
+			// Only list users who are allowed to publish
+			if (! $usero->has_cap('publish_posts')) {
+				continue;
+			}
+			if ($author->ID == $aktt->blog_post_author) {
+				$selected = 'selected="selected"';
+			}
+			else {
+				$selected = '';
+			}
+			$author_options .= "\n\t<option value='$author->ID' $selected>$author->user_nicename</option>";
 		}
-		if ($author->ID == $aktt->blog_post_author) {
-			$selected = 'selected="selected"';
-		}
-		else {
-			$selected = '';
-		}
-		$author_options .= "\n\t<option value='$author->ID' $selected>$author->user_nicename</option>";
 	}
 	
 	$js_libs = array(
