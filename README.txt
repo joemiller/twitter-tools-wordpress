@@ -1,7 +1,7 @@
 === Twitter Tools ===
 Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, widget
 Contributors: alexkingorg, crowdfavorite
-Requires at least: 2.6
+Requires at least: 2.8
 Tested up to: 3.0b1
 Stable tag: 2.3.1
 
