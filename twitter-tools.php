@@ -29,6 +29,7 @@ Author URI: http://alexking.org
 
 /* TODO
 
+- don't show meta box if posting option is disabled
 - update widget to new WP widget class
 - what should retweet support look like?
 - refactor digests to use WP-CRON
@@ -48,27 +49,6 @@ if (is_file(trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools.php')) {
 }
 else if (is_file(trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools/twitter-tools.php')) {
 	define('AKTT_FILE', trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools/twitter-tools.php');
-}
-
-if (!function_exists('wp_prototype_before_jquery')) {
-	function wp_prototype_before_jquery( $js_array ) {
-		if ( false === $jquery = array_search( 'jquery', $js_array ) )
-			return $js_array;
-	
-		if ( false === $prototype = array_search( 'prototype', $js_array ) )
-			return $js_array;
-	
-		if ( $prototype < $jquery )
-			return $js_array;
-	
-		unset($js_array[$prototype]);
-	
-		array_splice( $js_array, $jquery, 0, 'prototype' );
-	
-		return $js_array;
-	}
-	
-	add_filter( 'print_scripts_array', 'wp_prototype_before_jquery' );
 }
 
 define('AKTT_API_POST_STATUS', 'http://twitter.com/statuses/update.json');
@@ -1032,7 +1012,7 @@ function aktt_init() {
 		add_action('shutdown', 'aktt_update_tweets');
 		add_action('shutdown', 'aktt_ping_digests');
 	}
-	if (is_admin() || ($aktt->tweet_from_sidebar && current_user_can('publish_posts'))) {
+	if (!is_admin() && $aktt->tweet_from_sidebar && current_user_can('publish_posts')) {
 		switch ($aktt->js_lib) {
 			case 'jquery':
 				wp_enqueue_script('jquery');
@@ -1079,7 +1059,9 @@ function aktt_head_admin() {
 		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin').'"></script>
 	');
 }
-add_action('admin_head', 'aktt_head_admin');
+if (isset($_GET['page']) && $_GET['page'] == 'twitter-tools.php') {
+	add_action('admin_head', 'aktt_head_admin');
+}
 
 function aktt_resources() {
 	if (!empty($_GET['ak_action'])) {
@@ -1835,7 +1817,10 @@ function aktt_meta_box() {
 	}
 }
 function aktt_add_meta_box() {
-	add_meta_box('aktt_post_form', __('Twitter Tools', 'twitter-tools'), 'aktt_meta_box', 'post', 'side');
+	global $aktt;
+	if ($aktt->notify_twitter) {
+		add_meta_box('aktt_post_form', __('Twitter Tools', 'twitter-tools'), 'aktt_meta_box', 'post', 'side');
+	}
 }
 add_action('admin_init', 'aktt_add_meta_box');
 
