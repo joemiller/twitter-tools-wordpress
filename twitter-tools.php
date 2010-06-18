@@ -29,7 +29,6 @@ Author URI: http://alexking.org
 
 /* TODO
 
-- don't show meta box if posting option is disabled
 - update widget to new WP widget class
 - what should retweet support look like?
 - refactor digests to use WP-CRON
