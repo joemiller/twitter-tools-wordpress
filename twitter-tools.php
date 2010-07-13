@@ -32,10 +32,11 @@ Author URI: http://alexking.org
 - update widget to new WP widget class
 - what should retweet support look like?
 - refactor digests to use WP-CRON
+- truncate title so that full tweet content is < 140 chars
 
 */
 
-define('AKTT_VERSION', '2.1');
+define('AKTT_VERSION', '2.3');
 
 load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/language');
 
