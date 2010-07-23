@@ -33,6 +33,7 @@ Author URI: http://alexking.org
 - what should retweet support look like?
 - refactor digests to use WP-CRON
 - truncate title so that full tweet content is < 140 chars
+- possible post meta duplication issue (notify twitter = yes) in WP 3.0
 
 */
 
