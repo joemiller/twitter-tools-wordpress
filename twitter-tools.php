@@ -165,6 +165,7 @@ class twitter_tools {
 		$this->last_tweet_download = '';
 		$this->doing_tweet_download = '0';
 		$this->doing_digest_post = '0';
+		$this->oauth_hash = '';
 		$this->version = AKTT_VERSION;
 	}
 	
@@ -447,14 +448,17 @@ class twitter_tools {
 		if (empty($tweet) || empty($tweet->tw_text)) {
 			return;
 		}
-// TODO - check to make sure we have oauth data - use utility function
-		if (!($connection = aktt_oauth_connection($this->app_consumer_key, $this->app_consumer_secret, $this->oauth_token, $this->app_consumer_secret->oauth_token_secret))) {
-			return;
-		}		
 		$tweet = apply_filters('aktt_do_tweet', $tweet); // return false here to not tweet
 		if (!$tweet) {
 			return;
 		}
+
+		if ( !aktt_oauth_test() ) {
+			return;
+		}
+		require_once('twitteroauth.php');
+		$connection = new TwitterOAuth($this->app_consumer_key, $this->app_consumer_secret, $this->oauth_token, $this->oauth_token_secret);	
+		echo $connection->http_code;	
 		$connection->post(
 			AKTT_API_POST_STATUS
 			, array(
@@ -637,18 +641,18 @@ function aktt_status_url($username, $status) {
 }
 function aktt_oauth_test() {
 	global $aktt;
-	if ($connection = aktt_oauth_connection($aktt->app_consumer_key, $aktt->app_consumer_secret, $aktt->oauth_token, $aktt->oauth_token_secret)){
-		$connection->get('account/verify_credentials');
-		if (strcmp($connection->http_code, '200') == 0) {
+	if ( !empty($aktt->app_consumer_key)
+		&& !empty($aktt->app_consumer_secret)
+		&& !empty($aktt->oauth_token)
+		&& !empty($aktt->oauth_token_secret)
+	) {	
+		$hash = aktt_oauth_credentials_to_hash($aktt->app_consumer_key, $aktt->app_consumer_secret, $aktt->oauth_token, $aktt->oauth_token_secret);
+		if ($hash == get_option('aktt_oauth_hash')) {
 			return true;
-		}
-		else {
-	    return false;
-		}
+		} 
 	} else {
 		return false;
 	}
-		
 }
 
 function aktt_ping_digests() {
@@ -673,19 +677,19 @@ function aktt_update_tweets() {
 		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
-	
-	require_once('twitteroauth.php');
-// check for data, successful login? keep a last check stamp instead of last successful check stamp?
-// utility function to return an oauth connection
-	$connection = new TwitterOAuth($aktt->app_consumer_key, $aktt->app_consumer_secret, $aktt->oauth_token, $aktt->oauth_token_secret); 		
-	$connection->useragent = 'Twitter Tools http://alexking.org/projects/wordpress';
-	$data = $connection->get(AKTT_API_USER_TIMELINE);
-	if(strcmp($connection->http_code, '200') != 0) {
-		update_option('aktt_doing_tweet_download', '0');
+
+	if( aktt_oauth_test() ) {
+		$connection = aktt_oauth_connection($aktt->app_consumer_key, $aktt->app_consumer_secret, $aktt->oauth_token, $aktt->oauth_token_secret);
+		$data = $connection->get(AKTT_API_USER_TIMELINE);
+		if ($connection->http_code != '200') {
+			update_option('aktt_doing_tweet_download', '0');
+			return;
+		}
+	} else {
 		return;
-	}	
-	
+	}
 	// hash results to see if they're any different than the last update, if so, return
+
 	$hash = md5($data);
 	if ($hash == get_option('aktt_update_hash')) {
 		update_option('aktt_last_tweet_download', time());
@@ -888,7 +892,7 @@ function aktt_make_clickable($tweet) {
 
 function aktt_tweet_form($type = 'input', $extra = '') {
 	$output = '';
-	if (current_user_can('publish_posts')) {
+	if (current_user_can('publish_posts') && aktt_oauth_test()) {
 		$output .= '
 <form action="'.site_url('index.php').'" method="post" id="aktt_tweet_form" '.$extra.'>
 	<fieldset>
@@ -1035,6 +1039,9 @@ function aktt_init() {
 		}
 		if ($update) {
 			add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Please update your <a href="%s">Twitter Tools settings</a>', 'twitter-tools'), admin_url('options-general.php?page=twitter-tools.php'))."</p></div>';" ) );
+		}
+		if (!aktt_oauth_test()){
+			add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Twitter recently changed how it authenticates its users, you will need you to update your <a href="%s">Twitter Tools settings</a>', 'twitter-tools'), admin_url('options-general.php?page=twitter-tools.php')).". We apologize for any inconvenience these new authentication steps may cause.</p></div>';" ) );
 		}
 	}
 }
@@ -1427,6 +1434,18 @@ form.aktt p.submit,
 #aktt_authentication_display {
 	display: none;
 }
+#ak_twittertools_disconnect .auth_label {
+	display: block;
+	float: left;
+	width: 200px;
+	margin-right: 24px;
+	text-align: right;
+}
+#ak_twittertools_disconnect .auth_code {
+	
+}
+
+
 <?php
 				die();
 				break;
@@ -1448,6 +1467,11 @@ function aktt_oauth_connection($consumer_key = '', $consumer_secret = '', $oauth
 	} else {
 		return;
 	}
+}
+
+function aktt_oauth_credentials_to_hash($consumer_key = '', $consumer_secret = '', $oauth_token = '', $oauth_token_secret = ''){
+		$hash = md5($consumer_key.$consumer_secret.$oauth_token.$oauth_token_secret);
+		return $hash;		
 }
 
 function aktt_request_handler() {
@@ -1535,23 +1559,19 @@ function aktt_request_handler() {
 					$aktt->populate_settings();
 					$aktt->update_settings();
 					//testing for authentication
-					$auth_test = aktt_oauth_test();
-				} 	
-				
-				//Getting basic user info if presence and authorization test pass
-				if ($auth_test) {				
+					//$auth_test = aktt_oauth_test();
 					$connection = aktt_oauth_connection($aktt->app_consumer_key, $aktt->app_consumer_secret, $aktt->oauth_token, $aktt->oauth_token_secret); 		
 					$data = $connection->get('account/verify_credentials');
-					if(strcmp($connection->http_code, '200') == 0) {
+					if ($connection->http_code == '200') {
 						$data = json_decode($data);
-						update_option('aktt_username', stripslashes($data->user_name));
-					}
-					$message = 'success';
-				}
-				else {
+						update_option('aktt_twitter_username', stripslashes($data->screen_name));
+						$oauth_hash = aktt_oauth_credentials_to_hash($aktt->app_consumer_key, $aktt->app_consumer_secret, $aktt->oauth_token, $aktt->oauth_token_secret);
+						update_option('aktt_oauth_hash', $oauth_hash);
+						$message = 'success';
+					} else {
 					$message = 'fail';
+					}
 				}
-				
 				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&oauth='.$message));
 			break;
 			case 'aktt_twitter_disconnect':
@@ -1588,11 +1608,7 @@ function aktt_admin_tweet_form() {
 			'.aktt_tweet_form('textarea').'
 			</div>
 		');
-	} else {
-		print('
-			<p>'.__('Please check your', 'twitter-tools').' <a href="'.admin_url('options-general.php?page=twitter-tools.php').'">'.__('Twitter Tools settings</a> to make sure you are connected with Twitter.</a></p>', 'twitter-tools').'
-		');
-	}
+	} 
 }
 
 function aktt_options_form() {
@@ -1723,7 +1739,7 @@ function aktt_options_form() {
 			<div class="wrap" id="aktt_options_page">
 			<h2>'.__('Twitter Tools Options', 'twitter-tools').'</h2>');
 	if ( !aktt_oauth_test() ) {
-		print('
+		print('	
 				<h3>'.__('Instructions for connecting your blog with Twitter','twitter-tools').'</h3>
 				<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
 					<fieldset class="options">
@@ -1748,7 +1764,7 @@ function aktt_options_form() {
 					<label for="aktt_app_consumer_secret">'.__('Twitter Consumer Secret', 'twitter-tools').'</label>
 					<input type="text" size="25" name="aktt_app_consumer_secret" id="aktt_app_consumer_secret" value="'.esc_attr($aktt->app_consumer_secret).'" autocomplete="off">
 				</div>
-				<h4>3.Copy and paste your Access Token and Access Token Secret into the fields below</h4>
+				<h4>3. Copy and paste your Access Token and Access Token Secret into the fields below</h4>
 				<p>On the right hand side of your application page, click on \'My Access Token\'.</p>
 				<div class="option">
 					<label for="aktt_oauth_token">'.__('Access Token', 'twitter-tools').'</label>
@@ -1775,10 +1791,11 @@ function aktt_options_form() {
 					<a href="#" id="aktt_authentication_showhide" class="auth_information_link">Authentication Information</a>
 					<div id="aktt_authentication_display">
 						<fieldset class="options">
-							<div class="option">'.__('Consumer Key : ', 'twitter-tools').$aktt->app_consumer_key.'</div>
-							<div class="option">'.__('Consumer Secret : ', 'twitter-tools').$aktt->app_consumer_secret.'</div>
-							<div class="option">'.__('Access Token : ', 'twitter-tools').$aktt->oauth_token.'</div>
-							<div class="option">'.__('Access Token Secret : ', 'twitter-tools').$aktt->oauth_token_secret.'</div>
+							<div class="option"><span class="auth_label">'.__('Twitter Username ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->twitter_username.'</span></div>
+							<div class="option"><span class="auth_label">'.__('Consumer Key ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_key.'</span></div>
+							<div class="option"><span class="auth_label">'.__('Consumer Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_secret.'</span></div>
+							<div class="option"><span class="auth_label">'.__('Access Token ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token.'</span></div>
+							<div class="option"><span class="auth_label">'.__('Access Token Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token_secret.'</span></div>
 						</fieldset>
 						<p class="submit">
 						<input type="submit" name="submit" class="button-primary" value="'.__('Disconnect Your WordPress and Twitter Account', 'twitter-tools').'" />
