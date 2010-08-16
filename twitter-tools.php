@@ -29,13 +29,10 @@ Author URI: http://crowdfavorite.com
 
 /* TODO
 
-- Add apology for upgrading users
-
 - update widget to new WP widget class
 - what should retweet support look like?
 - refactor digests to use WP-CRON
-- truncate title so that full tweet content is < 140 chars
-- possible post meta duplication issue (notify twitter = yes) in WP 3.0
+- truncate super-long post titles so that full tweet content is < 140 chars
 
 */
 
@@ -99,7 +96,6 @@ function aktt_install() {
 }
 register_activation_hook(AKTT_FILE, 'aktt_install');
 
-
 class twitter_tools {
 	function twitter_tools() {
 		$this->options = array(
@@ -132,7 +128,6 @@ class twitter_tools {
 			, 'app_consumer_secret'
 			, 'oauth_token'
 			, 'oauth_token_secret'
-			
 		);
 		$this->twitter_username = '';
 		$this->create_blog_posts = '0';
@@ -268,7 +263,7 @@ class twitter_tools {
 			$this->upgrade();
 			$this->upgrade_default_tweet_prefix();
 			update_option('aktt_installed_version', AKTT_VERSION);
-			update_option('aktt_twitter_password', '');
+			delete_option('aktt_twitter_password');
 		}
 	}
 	
@@ -456,22 +451,18 @@ class twitter_tools {
 			return;
 		}
 
-		if ( !aktt_oauth_test() ) {
-			return;
-		}
-		require_once('twitteroauth.php');
-		$connection = new TwitterOAuth($this->app_consumer_key, $this->app_consumer_secret, $this->oauth_token, $this->oauth_token_secret);	
-		echo $connection->http_code;	
-		$connection->post(
-			AKTT_API_POST_STATUS
-			, array(
-				'status' => $tweet->tw_text
-				, 'source' => 'twittertools'
-			)
-		);
-		if (strcmp($connection->http_code, '200') == 0) {
-			update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
-			return true;
+		if (aktt_oauth_test() && ($connection = aktt_oauth_connection())) {
+			$connection->post(
+				AKTT_API_POST_STATUS
+				, array(
+					'status' => $tweet->tw_text
+					, 'source' => 'twittertools'
+				)
+			);
+			if (strcmp($connection->http_code, '200') == 0) {
+				update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
+				return true;
+			}
 		}
 		return false;
 	}
@@ -782,9 +773,8 @@ function aktt_sidebar_tweets($limit = null, $form = null) {
 	if (!empty($aktt->twitter_username)) {
   		$output .= '		<li class="aktt_more_updates"><a href="'.aktt_profile_url($aktt->twitter_username).'">'.__('More updates...', 'twitter-tools').'</a></li>'."\n";
 	}
-//TODO check for admin then for oauth connection
 	$output .= '</ul>';
-	if ($form !== false && $aktt->tweet_from_sidebar == '1') {
+	if ($form !== false && $aktt->tweet_from_sidebar == '1' && aktt_oauth_test()) {
   		$output .= aktt_tweet_form('input', 'onsubmit="akttPostTweet(); return false;"');
 		  $output .= '	<p id="aktt_tweet_posted_msg">'.__('Posting tweet...', 'twitter-tools').'</p>';
 	}
@@ -994,12 +984,9 @@ add_action('widgets_init', 'aktt_widget_init');
 
 function aktt_init() {
 	global $wpdb, $aktt;
-	$aktt = new twitter_tools;
-
 	$wpdb->aktt = $wpdb->prefix.'ak_twitter';
-
+	$aktt = new twitter_tools;
 	$aktt->get_settings();
-	
 	if (($aktt->last_tweet_download + $aktt->tweet_download_interval()) < time()) {
 		add_action('shutdown', 'aktt_update_tweets');
 		add_action('shutdown', 'aktt_ping_digests');
@@ -1042,8 +1029,8 @@ function aktt_head() {
 	global $aktt;
 	if ($aktt->tweet_from_sidebar) {
 		print('
-			<link rel="stylesheet" type="text/css" href="'.site_url('/index.php?ak_action=aktt_css').'" />
-			<script type="text/javascript" src="'.site_url('/index.php?ak_action=aktt_js').'"></script>
+			<link rel="stylesheet" type="text/css" href="'.site_url('/index.php?ak_action=aktt_css&v='.AKTT_VERSION).'" />
+			<script type="text/javascript" src="'.site_url('/index.php?ak_action=aktt_js&v='.AKTT_VERSION).'"></script>
 		');
 	}
 }
@@ -1051,8 +1038,8 @@ add_action('wp_head', 'aktt_head');
 
 function aktt_head_admin() {
 	print('
-		<link rel="stylesheet" type="text/css" href="'.admin_url('index.php?ak_action=aktt_css_admin').'" />
-		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin').'"></script>
+		<link rel="stylesheet" type="text/css" href="'.admin_url('index.php?ak_action=aktt_css_admin&v='.AKTT_VERSION).'" />
+		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin&v='.AKTT_VERSION).'"></script>
 	');
 }
 if (isset($_GET['page']) && $_GET['page'] == 'twitter-tools.php') {
@@ -1670,7 +1657,6 @@ function aktt_admin_tweet_form() {
 			</div>
 		');
 	}
-// TODO - reinstate check for successful auth
 	if ( aktt_oauth_test() ) {
 		print('
 			<div class="wrap" id="aktt_write_tweet">
@@ -1808,46 +1794,46 @@ function aktt_options_form() {
 	
 	print('	
 			<div class="wrap" id="aktt_options_page">
-			<h2>'.__('Twitter Tools Options', 'twitter-tools').' &nbsp; <script type="text/javascript">var WPHC_AFF_ID = "14303"; var WPHC_POSITION = "c1"; var WPHC_PRODUCT = "Twitter Tools ('.AKTT_VERSION.')"; var WPHC_WP_VERSION = "'.$wp_version.'";</script><script type="text/javascript" src="http://cloud.wphelpcenter.com/support-form/0001/deliver-a.js"></script></h2>');
+			<h2>'.__('Twitter Tools Options', 'twitter-tools').' &nbsp; <script type="text/javascript">var WPHC_AFF_ID = "14303"; var WPHC_POSITION = "c1"; var WPHC_PRODUCT = "Twitter Tools ('.AKTT_VERSION.')"; var WPHC_WP_VERSION = "'.$wp_version.'";</script><script type="text/javascript" src="http://cloud.wphelpcenter.com/support-form/0001/deliver-a.js"></script></h2>'
+	);
 	if ( !aktt_oauth_test() ) {
 		print('	
-				<h3>'.__('Connect to Twitter','twitter-tools').'</h3>
-				<p style="width: 700px;">'.__('In order to get started, we need to follow some steps to get this site registered with Twitter. This process is awkward and more complicated than it should be. We hope to have a better solution for this in a future release, but for now this system is what Twitter supports. If you have any trouble, please use the Support button above to contact <a href="http://wphelpcenter.com" target="_blank">WordPress HelpCenter</a> and provide code 14303.', 'twitter-tools').'</p> 
-				<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
-					<fieldset class="options">
-				<h4>'.__('1. Register your blog as an application on ', 'twitter-tools') . '<a href="http://dev.twitter.com/apps/new" title="'.__('Twitter App Registration','twitter-tools').'" target="_blank">'.__('Twitter\'s app registration page','twitter-tools').'</a></h4>
-				<div id="aktt_sub_instructions">
-					<ul>
-					<li>'.__('If you\'re not logged in, you can use your Twitter username and password' , 'twitter-tools').'</li>
-					<li>'.__('Your Application\'s Name will be what shows up after "via" in your twitter stream' , 'twitter-tools').'</li>
-					<li>'.__('Application Type should be set on ' , 'twitter-tools').'<strong>'.__('Browser' , 'twitter-tools').'</strong></li>
-					<li>'.__('The Callback URL should be ' , 'twitter-tools').'<strong>'.  get_bloginfo( 'url' ) .'</strong></li>
-					<li>'.__('Default Access type should be set to ' , 'twitter-tools').'<strong>'.__('Read &amp; Write' , 'twitter-tools').'</strong> '.__('(this is NOT the default)' , 'twitter-tools').'</li>
-					</ul>
-				<p>'.__('Once you have registered your site as an application, you will be provided with a consumer key and a comsumer secret.' , 'twitter-tools').'</p>
-				</div>
-				<h4>'.__('2. Copy and paste your consumer key and consumer secret into the fields below' , 'twitter-tools').'</h4>
-			
-				<div class="option">
-					<label for="aktt_app_consumer_key">'.__('Twitter Consumer Key', 'twitter-tools').'</label>
-					<input type="text" size="25" name="aktt_app_consumer_key" id="aktt_app_consumer_key" value="'.esc_attr($aktt->app_consumer_key).'" autocomplete="off">
-				</div>
-				<div class="option">
-					<label for="aktt_app_consumer_secret">'.__('Twitter Consumer Secret', 'twitter-tools').'</label>
-					<input type="text" size="25" name="aktt_app_consumer_secret" id="aktt_app_consumer_secret" value="'.esc_attr($aktt->app_consumer_secret).'" autocomplete="off">
-				</div>
-				<h4>3. Copy and paste your Access Token and Access Token Secret into the fields below</h4>
-				<p>On the right hand side of your application page, click on \'My Access Token\'.</p>
-				<div class="option">
-					<label for="aktt_oauth_token">'.__('Access Token', 'twitter-tools').'</label>
-					<input type="text" size="25" name="aktt_oauth_token" id="aktt_oauth_token" value="'.esc_attr($aktt->oauth_token).'" autocomplete="off">
-				</div>
-				<div class="option">
-					<label for="aktt_oauth_token_secret">'.__('Access Token Secret', 'twitter-tools').'</label>
-					<input type="text" size="25" name="aktt_oauth_token_secret" id="aktt_oauth_token_secret" value="'.esc_attr($aktt->oauth_token_secret).'" autocomplete="off">
-				</div>
+			<h3>'.__('Connect to Twitter','twitter-tools').'</h3>
+			<p style="width: 700px;">'.__('In order to get started, we need to follow some steps to get this site registered with Twitter. This process is awkward and more complicated than it should be. We hope to have a better solution for this in a future release, but for now this system is what Twitter supports. If you have any trouble, please use the Support button above to contact <a href="http://wphelpcenter.com" target="_blank">WordPress HelpCenter</a> and provide code 14303.', 'twitter-tools').'</p> 
+			<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
+				<fieldset class="options">
+					<h4>'.__('1. Register this site as an application on ', 'twitter-tools') . '<a href="http://dev.twitter.com/apps/new" title="'.__('Twitter App Registration','twitter-tools').'" target="_blank">'.__('Twitter\'s app registration page','twitter-tools').'</a></h4>
+					<div id="aktt_sub_instructions">
+						<ul>
+						<li>'.__('If you\'re not logged in, you can use your Twitter username and password' , 'twitter-tools').'</li>
+						<li>'.__('Your Application\'s Name will be what shows up after "via" in your twitter stream' , 'twitter-tools').'</li>
+						<li>'.__('Application Type should be set on ' , 'twitter-tools').'<strong>'.__('Browser' , 'twitter-tools').'</strong></li>
+						<li>'.__('The Callback URL should be ' , 'twitter-tools').'<strong>'.  get_bloginfo( 'url' ) .'</strong></li>
+						<li>'.__('Default Access type should be set to ' , 'twitter-tools').'<strong>'.__('Read &amp; Write' , 'twitter-tools').'</strong> '.__('(this is NOT the default)' , 'twitter-tools').'</li>
+						</ul>
+					<p>'.__('Once you have registered your site as an application, you will be provided with a consumer key and a comsumer secret.' , 'twitter-tools').'</p>
+					</div>
+					<h4>'.__('2. Copy and paste your consumer key and consumer secret into the fields below' , 'twitter-tools').'</h4>
+				
+					<div class="option">
+						<label for="aktt_app_consumer_key">'.__('Twitter Consumer Key', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_app_consumer_key" id="aktt_app_consumer_key" value="'.esc_attr($aktt->app_consumer_key).'" autocomplete="off">
+					</div>
+					<div class="option">
+						<label for="aktt_app_consumer_secret">'.__('Twitter Consumer Secret', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_app_consumer_secret" id="aktt_app_consumer_secret" value="'.esc_attr($aktt->app_consumer_secret).'" autocomplete="off">
+					</div>
+					<h4>3. Copy and paste your Access Token and Access Token Secret into the fields below</h4>
+					<p>On the right hand side of your application page, click on \'My Access Token\'.</p>
+					<div class="option">
+						<label for="aktt_oauth_token">'.__('Access Token', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_oauth_token" id="aktt_oauth_token" value="'.esc_attr($aktt->oauth_token).'" autocomplete="off">
+					</div>
+					<div class="option">
+						<label for="aktt_oauth_token_secret">'.__('Access Token Secret', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_oauth_token_secret" id="aktt_oauth_token_secret" value="'.esc_attr($aktt->oauth_token_secret).'" autocomplete="off">
+					</div>
 				</fieldset>
-			
 				<p class="submit">
 					<input type="submit" name="submit" class="button-primary" value="'.__('Connect to Twitter', 'twitter-tools').'" />
 				</p>
@@ -1859,126 +1845,126 @@ function aktt_options_form() {
 	}
 	else if ( aktt_oauth_test() ) {
 		print('	
-				<form id="ak_twittertools_disconnect" name="ak_twittertools_disconnect" action="'.admin_url('options-general.php').'" method="post">
-					<p><a href="#" id="aktt_authentication_showhide" class="auth_information_link">Account Information</a></p>
-					<div id="aktt_authentication_display">
-						<fieldset class="options">
-							<div class="option"><span class="auth_label">'.__('Twitter Username ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->twitter_username.'</span></div>
-							<div class="option"><span class="auth_label">'.__('Consumer Key ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_key.'</span></div>
-							<div class="option"><span class="auth_label">'.__('Consumer Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_secret.'</span></div>
-							<div class="option"><span class="auth_label">'.__('Access Token ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token.'</span></div>
-							<div class="option"><span class="auth_label">'.__('Access Token Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token_secret.'</span></div>
-						</fieldset>
-						<p class="submit">
-						<input type="submit" name="submit" class="button-primary" value="'.__('Disconnect Your WordPress and Twitter Account', 'twitter-tools').'" />
-						</p>
-						<input type="hidden" name="ak_action" value="aktt_twitter_disconnect" class="hidden" style="display: none;" />
-						'.wp_nonce_field('aktt_twitter_disconnect', '_wpnonce', true, false).wp_referer_field(false).' 
-					</div>		
-				</form>
-					
-				<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
-					<fieldset class="options">			
-						<div class="option">
-							<label for="aktt_notify_twitter">'.__('Enable option to create a tweet when you post in your blog?', 'twitter-tools').'</label>
-							<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.esc_attr($aktt->tweet_prefix).'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
-							<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for posting via XML-RPC', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
-							<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_blog_post_tags">'.__('Tag(s) for your tweet posts:', 'twitter-tools').'</label>
-							<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.esc_attr($aktt->blog_post_tags).'">
-							<span>'.__('Separate multiple tags with commas. Example: tweets, twitter', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_blog_post_author">'.__('Author for tweet posts:', 'twitter-tools').'</label>
-							<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar, digests and created blog posts?', 'twitter-tools').'</label>
-							<select name="aktt_exclude_reply_tweets" id="aktt_exclude_reply_tweets">'.$exclude_reply_tweets_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
-							<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.esc_attr($aktt->sidebar_tweet_count).'" />
-							<span>'.__('Numbers only please.', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_tweet_from_sidebar">'.__('Create tweets from your sidebar?', 'twitter-tools').'</label>
-							<select name="aktt_tweet_from_sidebar" id="aktt_tweet_from_sidebar">'.$tweet_from_sidebar_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_js_lib">'.__('JS Library to use?', 'twitter-tools').'</label>
-							<select name="aktt_js_lib" id="aktt_js_lib">'.$js_lib_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_give_tt_credit">'.__('Give Twitter Tools credit?', 'twitter-tools').'</label>
-							<select name="aktt_give_tt_credit" id="aktt_give_tt_credit">'.$give_tt_credit_options.'</select>
-						</div>
-					
-						<div class="aktt_experimental">
-							<h4>'.__('- Experimental -', 'twitter-tools').'</h4>
-					
-						<div class="option time_toggle">
-							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
-							<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.esc_attr($aktt->digest_daily_time).'" />
-						</div>
-						<div class="option">
-							<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
-							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
-						</div>
-						<div class="option time_toggle">
-							<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
-							<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.esc_attr($aktt->digest_weekly_time).'" />
-							<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
-						</div>
-						<div class="option">
-							<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.esc_attr($aktt->digest_title_weekly).'" />
-							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
-							<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
-						</div>
-					
-						</div>
-					
+			<form id="ak_twittertools_disconnect" name="ak_twittertools_disconnect" action="'.admin_url('options-general.php').'" method="post">
+				<p><a href="#" id="aktt_authentication_showhide" class="auth_information_link">Account Information</a></p>
+				<div id="aktt_authentication_display">
+					<fieldset class="options">
+						<div class="option"><span class="auth_label">'.__('Twitter Username ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->twitter_username.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Consumer Key ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_key.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Consumer Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_secret.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Access Token ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Access Token Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token_secret.'</span></div>
 					</fieldset>
 					<p class="submit">
-						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
+					<input type="submit" name="submit" class="button-primary" value="'.__('Disconnect Your WordPress and Twitter Account', 'twitter-tools').'" />
 					</p>
-					<input type="hidden" name="ak_action" value="aktt_update_settings" class="hidden" style="display: none;" />
-					'.wp_nonce_field('aktt_settings', '_wpnonce', true, false).wp_referer_field(false).'
-				</form>
-				<h2>'.__('Update Tweets / Reset Checking and Digests', 'twitter-tools').'</h2>
-				<form name="ak_twittertools_updatetweets" action="'.admin_url('options-general.php').'" method="get">
-					<p>'.__('Use these buttons to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
-					<p class="submit">
-						<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
-						<input type="submit" name="reset-button-1" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
-						<input type="submit" name="reset-button-2" value="'.__('Reset Digests', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_digests\';" />
-						<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
-					</p>
-					'.wp_nonce_field('aktt_update_tweets', '_wpnonce', true, false).wp_referer_field(false).'
-				</form>
+					<input type="hidden" name="ak_action" value="aktt_twitter_disconnect" class="hidden" style="display: none;" />
+					'.wp_nonce_field('aktt_twitter_disconnect', '_wpnonce', true, false).wp_referer_field(false).' 
+				</div>		
+			</form>
+					
+			<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
+				<fieldset class="options">			
+					<div class="option">
+						<label for="aktt_notify_twitter">'.__('Enable option to create a tweet when you post in your blog?', 'twitter-tools').'</label>
+						<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
+						<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.esc_attr($aktt->tweet_prefix).'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
+						<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for posting via XML-RPC', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
+						<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
+						<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_blog_post_tags">'.__('Tag(s) for your tweet posts:', 'twitter-tools').'</label>
+						<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.esc_attr($aktt->blog_post_tags).'">
+						<span>'.__('Separate multiple tags with commas. Example: tweets, twitter', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_blog_post_author">'.__('Author for tweet posts:', 'twitter-tools').'</label>
+						<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar, digests and created blog posts?', 'twitter-tools').'</label>
+						<select name="aktt_exclude_reply_tweets" id="aktt_exclude_reply_tweets">'.$exclude_reply_tweets_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
+						<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.esc_attr($aktt->sidebar_tweet_count).'" />
+						<span>'.__('Numbers only please.', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_tweet_from_sidebar">'.__('Create tweets from your sidebar?', 'twitter-tools').'</label>
+						<select name="aktt_tweet_from_sidebar" id="aktt_tweet_from_sidebar">'.$tweet_from_sidebar_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_js_lib">'.__('JS Library to use?', 'twitter-tools').'</label>
+						<select name="aktt_js_lib" id="aktt_js_lib">'.$js_lib_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_give_tt_credit">'.__('Give Twitter Tools credit?', 'twitter-tools').'</label>
+						<select name="aktt_give_tt_credit" id="aktt_give_tt_credit">'.$give_tt_credit_options.'</select>
+					</div>
+				
+					<div class="aktt_experimental">
+						<h4>'.__('- Experimental -', 'twitter-tools').'</h4>
+				
+					<div class="option time_toggle">
+						<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
+						<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
+						<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.esc_attr($aktt->digest_daily_time).'" />
+					</div>
+					<div class="option">
+						<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
+						<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
+						<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+					</div>
+					<div class="option time_toggle">
+						<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
+						<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
+						<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.esc_attr($aktt->digest_weekly_time).'" />
+						<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
+					</div>
+					<div class="option">
+						<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
+						<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.esc_attr($aktt->digest_title_weekly).'" />
+						<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
+						<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
+					</div>
+				
+					</div>
+				
+				</fieldset>
+				<p class="submit">
+					<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
+				</p>
+				<input type="hidden" name="ak_action" value="aktt_update_settings" class="hidden" style="display: none;" />
+				'.wp_nonce_field('aktt_settings', '_wpnonce', true, false).wp_referer_field(false).'
+			</form>
+			<h2>'.__('Update Tweets / Reset Checking and Digests', 'twitter-tools').'</h2>
+			<form name="ak_twittertools_updatetweets" action="'.admin_url('options-general.php').'" method="get">
+				<p>'.__('Use these buttons to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
+				<p class="submit">
+					<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
+					<input type="submit" name="reset-button-1" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
+					<input type="submit" name="reset-button-2" value="'.__('Reset Digests', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_digests\';" />
+					<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
+				</p>
+				'.wp_nonce_field('aktt_update_tweets', '_wpnonce', true, false).wp_referer_field(false).'
+			</form>
 	');
 	} //end elsif statement
 	do_action('aktt_options_form');

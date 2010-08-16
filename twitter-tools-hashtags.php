@@ -68,9 +68,6 @@ function aktt_hash_do_blog_post_tweet($tweet, $post) {
 add_filter('aktt_do_blog_post_tweet', 'aktt_hash_do_blog_post_tweet', 10, 2);
 
 function aktt_hash_save_post($post_id, $post) {
-
-error_log($post_id);
-
 	if (current_user_can('edit_post', $post_id)) {
 		update_post_meta($post_id, '_aktt_hash_meta', $_POST['_aktt_hash_meta']);
 	}
