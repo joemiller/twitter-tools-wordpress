@@ -3,7 +3,7 @@
 Plugin Name: Twitter Tools - Hashtags 
 Plugin URI: http://crowdfavorite.com/wordpress/ 
 Description: Set #hashtags for blog post tweets sent by Twitter Tools. This plugin relies on Twitter Tools, configure it on the Twitter Tools settings page.
-Version: 2.3.1
+Version: 2.4
 Author: Crowd Favorite
 Author URI: http://crowdfavorite.com
 */
@@ -17,8 +17,8 @@ if (!defined('PLUGINDIR')) {
 load_plugin_textdomain('twitter-tools-hash');
 
 function aktt_hash_post_options() {
-	global $post;
-	empty($post->ID) ? $hashtags = get_option('aktt_hash_tags') : $hashtags = get_post_meta($post->ID, '_aktt_hash_meta', true);
+	global $self, $post;
+	$self == 'post-new.php' ? $hashtags = get_option('aktt_hash_tags') : $hashtags = get_post_meta($post->ID, '_aktt_hash_meta', true);
 	echo '<p>
 		<label for="_aktt_hash_meta">'.__('#hashtags:', 'twitter-tools-hash').'</label>
 		<input type="text" id="_aktt_hash_meta" name="_aktt_hash_meta" value="'.attribute_escape($hashtags).'" />
@@ -68,6 +68,9 @@ function aktt_hash_do_blog_post_tweet($tweet, $post) {
 add_filter('aktt_do_blog_post_tweet', 'aktt_hash_do_blog_post_tweet', 10, 2);
 
 function aktt_hash_save_post($post_id, $post) {
+
+error_log($post_id);
+
 	if (current_user_can('edit_post', $post_id)) {
 		update_post_meta($post_id, '_aktt_hash_meta', $_POST['_aktt_hash_meta']);
 	}
