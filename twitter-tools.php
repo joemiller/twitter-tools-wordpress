@@ -1,11 +1,11 @@
 <?php
 /*
 Plugin Name: Twitter Tools
-Plugin URI: http://alexking.org/projects/wordpress
+Plugin URI: http://crowdfavorite.com/wordpress/plugins/twitter-tools/
 Description: A complete integration between your WordPress blog and <a href="http://twitter.com">Twitter</a>. Bring your tweets into your blog and pass your blog posts to Twitter. Show your tweets in your sidebar, and post tweets from your WordPress admin.
-Version: 2.3.2dev
-Author: Alex King
-Author URI: http://alexking.org
+Version: 2.4
+Author: Crowd Favorite
+Author URI: http://crowdfavorite.com
 */
 
 // Copyright (c) 2007-2010 Crowd Favorite, Ltd., Alex King. All rights reserved.
@@ -32,12 +32,11 @@ Author URI: http://alexking.org
 - update widget to new WP widget class
 - what should retweet support look like?
 - refactor digests to use WP-CRON
-- truncate title so that full tweet content is < 140 chars
-- possible post meta duplication issue (notify twitter = yes) in WP 3.0
+- truncate super-long post titles so that full tweet content is < 140 chars
 
 */
 
-define('AKTT_VERSION', '2.3');
+define('AKTT_VERSION', '2.4');
 
 load_plugin_textdomain('twitter-tools', false, dirname(plugin_basename(__FILE__)) . '/language');
 
@@ -61,7 +60,7 @@ define('AKTT_HASHTAG_URL', 'http://search.twitter.com/search?q=###HASHTAG###');
 
 function aktt_install() {
 	global $wpdb;
-
+	
 	$aktt_install = new twitter_tools;
 	$wpdb->aktt = $wpdb->prefix.'ak_twitter';
 	$tables = $wpdb->get_col("
@@ -101,7 +100,6 @@ class twitter_tools {
 	function twitter_tools() {
 		$this->options = array(
 			'twitter_username'
-			, 'twitter_password'
 			, 'create_blog_posts'
 			, 'create_digest'
 			, 'create_digest_weekly'
@@ -126,9 +124,12 @@ class twitter_tools {
 			, 'js_lib'
 			, 'digest_tweet_order'
 			, 'notify_twitter_default'
+			, 'app_consumer_key'
+			, 'app_consumer_secret'
+			, 'oauth_token'
+			, 'oauth_token_secret'
 		);
 		$this->twitter_username = '';
-		$this->twitter_password = '';
 		$this->create_blog_posts = '0';
 		$this->create_digest = '0';
 		$this->create_digest_weekly = '0';
@@ -150,6 +151,10 @@ class twitter_tools {
 		$this->js_lib = 'jquery';
 		$this->digest_tweet_order = 'ASC';
 		$this->tweet_prefix = 'New blog post';
+		$this->app_consumer_key = '';
+		$this->app_consumer_secret = '';
+		$this->oauth_token = '';
+		$this->oauth_token_secret ='';
 		// not included in options
 		$this->update_hash = '';
 		$this->tweet_format = $this->tweet_prefix.': %s %s';
@@ -157,6 +162,7 @@ class twitter_tools {
 		$this->last_tweet_download = '';
 		$this->doing_tweet_download = '0';
 		$this->doing_digest_post = '0';
+		$this->oauth_hash = '';
 		$this->version = AKTT_VERSION;
 	}
 	
@@ -257,6 +263,7 @@ class twitter_tools {
 			$this->upgrade();
 			$this->upgrade_default_tweet_prefix();
 			update_option('aktt_installed_version', AKTT_VERSION);
+			delete_option('aktt_twitter_password');
 		}
 	}
 	
@@ -435,38 +442,27 @@ class twitter_tools {
 		return 600;
 	}
 	
-	function do_tweet($tweet = '') {
-		if (empty($this->twitter_username) 
-			|| empty($this->twitter_password) 
-			|| empty($tweet)
-			|| empty($tweet->tw_text)
-		) {
+	function do_tweet($tweet = '') {		
+		if (empty($tweet) || empty($tweet->tw_text)) {
 			return;
 		}
 		$tweet = apply_filters('aktt_do_tweet', $tweet); // return false here to not tweet
 		if (!$tweet) {
 			return;
 		}
-		require_once(ABSPATH.WPINC.'/class-snoopy.php');
-		$snoop = new Snoopy;
-		$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
-		$snoop->rawheaders = array(
-			'X-Twitter-Client' => 'Twitter Tools'
-			, 'X-Twitter-Client-Version' => $this->version
-			, 'X-Twitter-Client-URL' => 'http://alexking.org/projects/wordpress/twitter-tools.xml'
-		);
-		$snoop->user = $this->twitter_username;
-		$snoop->pass = $this->twitter_password;
-		$snoop->submit(
-			AKTT_API_POST_STATUS
-			, array(
-				'status' => $tweet->tw_text
-				, 'source' => 'twittertools'
-			)
-		);
-		if (strpos($snoop->response_code, '200')) {
-			update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
-			return true;
+
+		if (aktt_oauth_test() && ($connection = aktt_oauth_connection())) {
+			$connection->post(
+				AKTT_API_POST_STATUS
+				, array(
+					'status' => $tweet->tw_text
+					, 'source' => 'twittertools'
+				)
+			);
+			if (strcmp($connection->http_code, '200') == 0) {
+				update_option('aktt_last_tweet_download', strtotime('-28 minutes'));
+				return true;
+			}
 		}
 		return false;
 	}
@@ -635,23 +631,10 @@ function aktt_status_url($username, $status) {
 		, AKTT_STATUS_URL
 	);
 }
-
-function aktt_login_test($username, $password) {
-	require_once(ABSPATH.WPINC.'/class-snoopy.php');
-	$snoop = new Snoopy;
-	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
-	$snoop->user = $username;
-	$snoop->pass = $password;
-	$snoop->fetch(AKTT_API_USER_TIMELINE);
-	if (strpos($snoop->response_code, '200') !== false) {
-		return __("Login succeeded, you're good to go.", 'twitter-tools');
-	}
-	else {
-		$results = json_decode($snoop->results);
-		return sprintf(__('Sorry, login failed. Error message from Twitter: %s', 'twitter-tools'), $results->error);
-	}
+function aktt_oauth_test() {
+	global $aktt;
+	return ( aktt_oauth_credentials_to_hash() == get_option('aktt_oauth_hash') );
 }
-
 
 function aktt_ping_digests() {
 	global $aktt;
@@ -660,7 +643,7 @@ function aktt_ping_digests() {
 
 function aktt_update_tweets() {
 	global $aktt;
-
+	
 	// let the last update run for 10 minutes
 	if (time() - intval(get_option('aktt_doing_tweet_download')) < $aktt->tweet_download_interval()) {
 		return;
@@ -671,24 +654,23 @@ function aktt_update_tweets() {
 	}
 	update_option('aktt_doing_tweet_download', time());
 	global $wpdb, $aktt;
-	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
-		update_option('aktt_doing_tweet_download', '0');
-		return;
-	}
-	require_once(ABSPATH.WPINC.'/class-snoopy.php');
-	$snoop = new Snoopy;
-	$snoop->agent = 'Twitter Tools http://alexking.org/projects/wordpress';
-	$snoop->user = $aktt->twitter_username;
-	$snoop->pass = $aktt->twitter_password;
-	$snoop->fetch(AKTT_API_USER_TIMELINE);
-
-	if (!strpos($snoop->response_code, '200')) {
+	if (empty($aktt->twitter_username)) {
 		update_option('aktt_doing_tweet_download', '0');
 		return;
 	}
 
-	$data = $snoop->results;
+	if ( aktt_oauth_test() && ($connection = aktt_oauth_connection()) ) {
+		$data = $connection->get(AKTT_API_USER_TIMELINE);
+		if ($connection->http_code != '200') {
+			update_option('aktt_doing_tweet_download', '0');
+			return;
+		}
+	}
+	else {
+		return;
+	}
 	// hash results to see if they're any different than the last update, if so, return
+
 	$hash = md5($data);
 	if ($hash == get_option('aktt_update_hash')) {
 		update_option('aktt_last_tweet_download', time());
@@ -720,9 +702,8 @@ function aktt_update_tweets() {
 				if (!empty($tw_data->in_reply_to_status_id)) {
 					$tweet->tw_reply_tweet = $tw_data->in_reply_to_status_id;
 					$url = aktt_api_status_show_url($tw_data->in_reply_to_status_id);
-					$snoop->fetch($url);
-					if (strpos($snoop->response_code, '200') !== false) {
-						$data = $snoop->results;
+					$data = $connection->get($url);
+					if (strcmp($connection->http_code, '200') == 0) {
 						$status = json_decode($data);
 						$tweet->tw_reply_username = $status->user->screen_name;
 					}
@@ -737,7 +718,6 @@ function aktt_update_tweets() {
 	aktt_reset_tweet_checking($hash, time());
 	do_action('aktt_update_tweets');
 }
-
 
 function aktt_reset_tweet_checking($hash = '', $time = 0) {
 	if (!current_user_can('manage_options')) {
@@ -794,7 +774,7 @@ function aktt_sidebar_tweets($limit = null, $form = null) {
   		$output .= '		<li class="aktt_more_updates"><a href="'.aktt_profile_url($aktt->twitter_username).'">'.__('More updates...', 'twitter-tools').'</a></li>'."\n";
 	}
 	$output .= '</ul>';
-	if ($form !== false && $aktt->tweet_from_sidebar == '1' && !empty($aktt->twitter_username) && !empty($aktt->twitter_password)) {
+	if ($form !== false && $aktt->tweet_from_sidebar == '1' && aktt_oauth_test()) {
   		$output .= aktt_tweet_form('input', 'onsubmit="akttPostTweet(); return false;"');
 		  $output .= '	<p id="aktt_tweet_posted_msg">'.__('Posting tweet...', 'twitter-tools').'</p>';
 	}
@@ -892,7 +872,7 @@ function aktt_make_clickable($tweet) {
 
 function aktt_tweet_form($type = 'input', $extra = '') {
 	$output = '';
-	if (current_user_can('publish_posts')) {
+	if (current_user_can('publish_posts') && aktt_oauth_test()) {
 		$output .= '
 <form action="'.site_url('index.php').'" method="post" id="aktt_tweet_form" '.$extra.'>
 	<fieldset>
@@ -1004,10 +984,8 @@ add_action('widgets_init', 'aktt_widget_init');
 
 function aktt_init() {
 	global $wpdb, $aktt;
-	$aktt = new twitter_tools;
-
 	$wpdb->aktt = $wpdb->prefix.'ak_twitter';
-
+	$aktt = new twitter_tools;
 	$aktt->get_settings();
 	if (($aktt->last_tweet_download + $aktt->tweet_download_interval()) < time()) {
 		add_action('shutdown', 'aktt_update_tweets');
@@ -1033,10 +1011,14 @@ function aktt_init() {
 			update_option('aktt_tweet_prefix', $aktt->tweet_prefix);
 			$update = true;
 		}
-		if (get_option('aktt_installed_version') != AKTT_VERSION) {
+		$installed_version = get_option('aktt_installed_version');
+		if ($installed_version != AKTT_VERSION) {
 			$update = true;
 		}
-		if ($update) {
+		if (!empty($installed_version) && version_compare($installed_version, '2.4', '<') && !aktt_oauth_test()) {
+			add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Twitter recently changed how it authenticates its users, you will need you to update your <a href="%s">Twitter Tools settings</a>. We apologize for any inconvenience these new authentication steps may cause.', 'twitter-tools'), admin_url('options-general.php?page=twitter-tools.php'))."</p></div>';" ) );
+		}
+		else if ($update) {
 			add_action('admin_notices', create_function( '', "echo '<div class=\"error\"><p>".sprintf(__('Please update your <a href="%s">Twitter Tools settings</a>', 'twitter-tools'), admin_url('options-general.php?page=twitter-tools.php'))."</p></div>';" ) );
 		}
 	}
@@ -1047,8 +1029,8 @@ function aktt_head() {
 	global $aktt;
 	if ($aktt->tweet_from_sidebar) {
 		print('
-			<link rel="stylesheet" type="text/css" href="'.site_url('/index.php?ak_action=aktt_css').'" />
-			<script type="text/javascript" src="'.site_url('/index.php?ak_action=aktt_js').'"></script>
+			<link rel="stylesheet" type="text/css" href="'.site_url('/index.php?ak_action=aktt_css&v='.AKTT_VERSION).'" />
+			<script type="text/javascript" src="'.site_url('/index.php?ak_action=aktt_js&v='.AKTT_VERSION).'"></script>
 		');
 	}
 }
@@ -1056,8 +1038,8 @@ add_action('wp_head', 'aktt_head');
 
 function aktt_head_admin() {
 	print('
-		<link rel="stylesheet" type="text/css" href="'.admin_url('index.php?ak_action=aktt_css_admin').'" />
-		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin').'"></script>
+		<link rel="stylesheet" type="text/css" href="'.admin_url('index.php?ak_action=aktt_css_admin&v='.AKTT_VERSION).'" />
+		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin&v='.AKTT_VERSION).'"></script>
 	');
 }
 if (isset($_GET['page']) && $_GET['page'] == 'twitter-tools.php') {
@@ -1176,26 +1158,12 @@ function akttReset() {
 			case 'aktt_js_admin':
 				header("Content-Type: text/javascript");
 ?>
-function akttTestLogin() {
-	var result = jQuery('#aktt_login_test_result');
-	result.show().addClass('aktt_login_result_wait').html('<?php _e('Testing...', 'twitter-tools'); ?>');
-	jQuery.post(
-		"<?php echo admin_url('index.php'); ?>",
-		{
-			ak_action: "aktt_login_test",
-			aktt_twitter_username: jQuery('#aktt_twitter_username').val(),
-			aktt_twitter_password: jQuery('#aktt_twitter_password').val()
-		},
-		function(data) {
-			result.html(data).removeClass('aktt_login_result_wait');
-			setTimeout('akttTestLoginResult();', 5000);
-		}
-	);
-};
 
-function akttTestLoginResult() {
-	jQuery('#aktt_login_test_result').fadeOut('slow');
-};
+jQuery(function($) {
+	$("#aktt_authentication_showhide").click(function(){
+		$("#aktt_authentication_display").slideToggle();
+	});
+});
 
 (function($){
 
@@ -1359,19 +1327,23 @@ jQuery(function() {
 	height: 300px;
 	width: 95%;
 }
+
 form.aktt .options,
-#ak_twittertools .options {
+#ak_twittertools .options,
+#ak_twittertools_disconnect .options {
 	overflow: hidden;
 	border: none;
 }
 form.aktt .option,
-#ak_twittertools .option {
+#ak_twittertools .option,
+#ak_twittertools_disconnect .option {
 	overflow: hidden;
 	padding-bottom: 9px;
 	padding-top: 9px;
 }
 form.aktt .option label,
-#ak_twittertools .option label {
+#ak_twittertools .option label,
+#ak_twittertools_disconnect .option label {
 	display: block;
 	float: left;
 	width: 200px;
@@ -1390,19 +1362,18 @@ form.aktt .option span,
 form.aktt select,
 form.aktt input,
 #ak_twittertools select,
-#ak_twittertools input {
+#ak_twittertools input,
+#ak_twittertools_disconnect input {
 	float: left;
 	display: block;
 	margin-right: 6px;
 }
 form.aktt p.submit,
-#ak_twittertools p.submit {
+#ak_twittertools p.submit,
+#ak_twittertools_disconnect p.submit {
 	overflow: hidden;
 }
-#ak_twittertools #aktt_login_test_result {
-	display: inline;
-	padding: 3px;
-}
+
 #ak_twittertools fieldset.options .option span.aktt_login_result_wait {
 	background: #ffc;
 }
@@ -1418,6 +1389,9 @@ form.aktt p.submit,
 #ak_twittertools .active .daypicker {
 	display: block
 }
+#ak_twittertools_disconnect .auth_information_link{
+	margin-left: 6px;
+}
 .aktt_experimental {
 	background: #eee;
 	border: 2px solid #ccc;
@@ -1428,6 +1402,106 @@ form.aktt p.submit,
 	padding: 10px;
 	text-align: center;
 }
+#aktt_sub_instructions ul {
+	list-style-type: circle;
+	padding-top:0px;
+}
+#aktt_sub_instructions ul li{
+	margin-left: 20px;
+}
+#aktt_authentication_display {
+	display: none;
+}
+#ak_twittertools_disconnect .auth_label {
+	display: block;
+	float: left;
+	width: 200px;
+	margin-right: 24px;
+	text-align: right;
+}
+#ak_twittertools_disconnect .auth_code {
+	
+}
+
+.help {
+	color: #777;
+	font-size: 11px;
+}
+.txt-center {
+	text-align: center;
+}
+#cf {
+	width: 90%;
+}
+
+/* Developed by and Support by callouts */
+#cf-callouts {
+	background: url(http://cloud.wphelpcenter.com/resources/wp-admin-0001/border-fade-sprite.gif) 0 0 repeat-x;
+	float: left;
+	margin: 18px 0;
+}
+.cf-callout {
+	float: left;
+	margin-top: 18px;
+	max-width: 500px;
+	width: 50%;
+}
+#cf-callout-credit {
+	margin-right: 9px;
+}
+#cf-callout-credit .cf-box-title {
+	background: #193542 url(http://cloud.wphelpcenter.com/resources/wp-admin-0001/box-sprite.png) 0 0 repeat-x;
+	border-bottom: 1px solid #0C1A21;
+}
+#cf-callout-support {
+	margin-left: 9px;
+}
+#cf-callout-support .cf-box-title {
+	background: #8D2929 url(http://cloud.wphelpcenter.com/resources/wp-admin-0001/box-sprite.png) 0 -200px repeat-x;
+	border-bottom: 1px solid #461414;
+}
+
+/* General cf-box styles */
+.cf-box { 
+	background: #EFEFEF url(http://cloud.wphelpcenter.com/resources/wp-admin-0001/box-sprite.png) 0 -400px repeat-x;
+	border: 1px solid #E3E3E3;
+	border-radius: 5px;
+	-moz-border-radius: 5px;
+	-webkit-border-radius: 5px;
+	-khtml-border-radius: 5px;
+}
+.cf-box .cf-box-title {
+	color: #fff;
+	font-size: 14px;
+	font-weight: normal;
+	padding: 6px 15px;
+	margin: 0 0 12px 0;
+	-moz-border-radius-topleft: 5px;
+	-webkit-border-top-left-radius: 5px;
+	-khtml-border-top-left-radius: 5px;
+	border-top-left-radius: 5px;
+	-moz-border-radius-topright: 5px;
+	-webkit-border-top-right-radius: 5px;
+	-khtml-border-top-right-radius: 5px;
+	border-top-right-radius: 5px;
+	text-align: center;
+	text-shadow: #333 0 1px 1px;
+}
+.cf-box .cf-box-title a {
+	display: block;
+	color: #fff;
+}
+.cf-box .cf-box-title a:hover {
+	color: #E1E1E1;
+}
+.cf-box .cf-box-content {
+	margin: 0 15px 15px 15px;
+}
+.cf-box .cf-box-content p {
+	font-size: 11px;
+}
+
+
 <?php
 				die();
 				break;
@@ -1435,6 +1509,30 @@ form.aktt p.submit,
 	}
 }
 add_action('init', 'aktt_resources', 1);
+
+function aktt_oauth_connection() {
+	global $aktt;
+	if ( !empty($aktt->app_consumer_key) && !empty($aktt->app_consumer_secret) && !empty($aktt->oauth_token) && !empty($aktt->oauth_token_secret) ) {	
+		require_once('twitteroauth.php');
+		$connection = new TwitterOAuth(
+			$aktt->app_consumer_key, 
+			$aktt->app_consumer_secret, 
+			$aktt->oauth_token, 
+			$aktt->oauth_token_secret
+		);
+		$connection->useragent = 'Twitter Tools http://alexking.org/projects/wordpress';
+		return $connection;
+	}
+	else {
+		return false;
+	}
+}
+
+function aktt_oauth_credentials_to_hash() {
+	global $aktt;
+	$hash = md5($aktt->app_consumer_key.$aktt->app_consumer_secret.$aktt->oauth_token.$aktt->oauth_token_secret);
+	return $hash;		
+}
 
 function aktt_request_handler() {
 	global $wpdb, $aktt;
@@ -1503,18 +1601,48 @@ function aktt_request_handler() {
 						wp_redirect(admin_url('post-new.php?page=twitter-tools.php&tweet-posted=true'));
 					}
 					else {
-						wp_die(__('Oops, your tweet was not posted. Please check your username and password and that Twitter is up and running happily.', 'twitter-tools'));
+						wp_die(__('Oops, your tweet was not posted. Please check your blog is connected to Twitter and Twitter is up and running happily.', 'twitter-tools'));
 					}
 					die();
 				}
 				break;
-			case 'aktt_login_test':
-				$test = @aktt_login_test(
-					@stripslashes($_POST['aktt_twitter_username'])
-					, @stripslashes($_POST['aktt_twitter_password'])
-				);
-				die(__($test, 'twitter-tools'));
-				break;
+			case 'aktt_oauth_test':
+				if (!wp_verify_nonce($_POST['_wpnonce'], 'aktt_oauth_test')) {
+					wp_die('Oops, please try again.');
+				}
+				$auth_test = false;
+				if ( !empty($_POST['aktt_app_consumer_key'])
+					&& !empty($_POST['aktt_app_consumer_secret'])
+					&& !empty($_POST['aktt_oauth_token'])
+					&& !empty($_POST['aktt_oauth_token_secret'])
+				) {
+					$aktt->populate_settings();
+					$aktt->update_settings();
+					$message = 'fail';
+					if ($connection = aktt_oauth_connection()) {
+						$data = $connection->get('account/verify_credentials');
+						if ($connection->http_code == '200') {
+							$data = json_decode($data);
+							update_option('aktt_twitter_username', stripslashes($data->screen_name));
+							$oauth_hash = aktt_oauth_credentials_to_hash();
+							update_option('aktt_oauth_hash', $oauth_hash);
+							$message = 'success';
+						}
+					}
+				}
+				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&oauth='.$message));
+			break;
+			case 'aktt_twitter_disconnect':
+				if (!wp_verify_nonce($_POST['_wpnonce'], 'aktt_twitter_disconnect')) {
+					wp_die('Oops, please try again.');
+				}
+				
+				update_option('aktt_app_consumer_key', '');
+				update_option('aktt_app_consumer_secret', '');
+				update_option('aktt_oauth_token', '');
+				update_option('aktt_oauth_token_secret', '');
+				wp_redirect(admin_url('options-general.php?page=twitter-tools.php&updated=true'));
+			break;
 		}
 	}
 }
@@ -1529,28 +1657,19 @@ function aktt_admin_tweet_form() {
 			</div>
 		');
 	}
-	print('
-		<div class="wrap" id="aktt_write_tweet">
-	');
-	if (empty($aktt->twitter_username) || empty($aktt->twitter_password)) {
+	if ( aktt_oauth_test() ) {
 		print('
-			<p>'.__('Please enter your <a href="http://twitter.com">Twitter</a> account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.', 'twitter-tools').'</p>		
-		');
-	}
-	else {
-		print('
+			<div class="wrap" id="aktt_write_tweet">
 			<h2>'.__('Write Tweet', 'twitter-tools').'</h2>
 			<p>'.__('This will create a new \'tweet\' in <a href="http://twitter.com">Twitter</a> using the account information in your <a href="options-general.php?page=twitter-tools.php">Twitter Tools Options</a>.', 'twitter-tools').'</p>
 			'.aktt_tweet_form('textarea').'
+			</div>
 		');
-	}
-	print('
-		</div>
-	');
+	} 
 }
 
 function aktt_options_form() {
-	global $wpdb, $aktt;
+	global $wpdb, $aktt, $wp_version;
 
 	$categories = get_categories('hide_empty=0');
 	$cat_options = '';
@@ -1655,138 +1774,226 @@ function aktt_options_form() {
 			</div>
 		');
 	}
-	print('
+	
+	if ( strcmp($_GET['oauth'], "success" ) == 0 ) {
+		print('
+			<div id="message" class="updated fade">
+				<p>'.__('Yay! We connected with Twitter.', 'twitter-tools').'</p>
+			</div>
+
+		');
+	}
+	else if (strcmp($_GET['oauth'], "fail" ) == 0 ) {
+		print('
+			<div id="message" class="updated fade">
+				<p>'.__('Authentication Failed. Please check your credentials and make sure <a href="http://www.twitter.com/" title="Twitter" target="_blank">Twitter</a> is up and running.', 'twitter-tools').'</p>
+			</div>
+
+		');
+	}
+	
+	print('	
 			<div class="wrap" id="aktt_options_page">
-				<h2>'.__('Twitter Tools Options', 'twitter-tools').'</h2>
-				<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
+			<h2>'.__('Twitter Tools Options', 'twitter-tools').' &nbsp; <script type="text/javascript">var WPHC_AFF_ID = "14303"; var WPHC_POSITION = "c1"; var WPHC_PRODUCT = "Twitter Tools ('.AKTT_VERSION.')"; var WPHC_WP_VERSION = "'.$wp_version.'";</script><script type="text/javascript" src="http://cloud.wphelpcenter.com/support-form/0001/deliver-a.js"></script></h2>'
+	);
+	if ( !aktt_oauth_test() ) {
+		print('	
+			<h3>'.__('Connect to Twitter','twitter-tools').'</h3>
+			<p style="width: 700px;">'.__('In order to get started, we need to follow some steps to get this site registered with Twitter. This process is awkward and more complicated than it should be. We hope to have a better solution for this in a future release, but for now this system is what Twitter supports. If you have any trouble, please use the Support button above to contact <a href="http://wphelpcenter.com" target="_blank">WordPress HelpCenter</a> and provide code 14303.', 'twitter-tools').'</p> 
+			<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
+				<fieldset class="options">
+					<h4>'.__('1. Register this site as an application on ', 'twitter-tools') . '<a href="http://dev.twitter.com/apps/new" title="'.__('Twitter App Registration','twitter-tools').'" target="_blank">'.__('Twitter\'s app registration page','twitter-tools').'</a></h4>
+					<div id="aktt_sub_instructions">
+						<ul>
+						<li>'.__('If you\'re not logged in, you can use your Twitter username and password' , 'twitter-tools').'</li>
+						<li>'.__('Your Application\'s Name will be what shows up after "via" in your twitter stream' , 'twitter-tools').'</li>
+						<li>'.__('Application Type should be set on ' , 'twitter-tools').'<strong>'.__('Browser' , 'twitter-tools').'</strong></li>
+						<li>'.__('The Callback URL should be ' , 'twitter-tools').'<strong>'.  get_bloginfo( 'url' ) .'</strong></li>
+						<li>'.__('Default Access type should be set to ' , 'twitter-tools').'<strong>'.__('Read &amp; Write' , 'twitter-tools').'</strong> '.__('(this is NOT the default)' , 'twitter-tools').'</li>
+						</ul>
+					<p>'.__('Once you have registered your site as an application, you will be provided with a consumer key and a comsumer secret.' , 'twitter-tools').'</p>
+					</div>
+					<h4>'.__('2. Copy and paste your consumer key and consumer secret into the fields below' , 'twitter-tools').'</h4>
+				
+					<div class="option">
+						<label for="aktt_app_consumer_key">'.__('Twitter Consumer Key', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_app_consumer_key" id="aktt_app_consumer_key" value="'.esc_attr($aktt->app_consumer_key).'" autocomplete="off">
+					</div>
+					<div class="option">
+						<label for="aktt_app_consumer_secret">'.__('Twitter Consumer Secret', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_app_consumer_secret" id="aktt_app_consumer_secret" value="'.esc_attr($aktt->app_consumer_secret).'" autocomplete="off">
+					</div>
+					<h4>3. Copy and paste your Access Token and Access Token Secret into the fields below</h4>
+					<p>On the right hand side of your application page, click on \'My Access Token\'.</p>
+					<div class="option">
+						<label for="aktt_oauth_token">'.__('Access Token', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_oauth_token" id="aktt_oauth_token" value="'.esc_attr($aktt->oauth_token).'" autocomplete="off">
+					</div>
+					<div class="option">
+						<label for="aktt_oauth_token_secret">'.__('Access Token Secret', 'twitter-tools').'</label>
+						<input type="text" size="25" name="aktt_oauth_token_secret" id="aktt_oauth_token_secret" value="'.esc_attr($aktt->oauth_token_secret).'" autocomplete="off">
+					</div>
+				</fieldset>
+				<p class="submit">
+					<input type="submit" name="submit" class="button-primary" value="'.__('Connect to Twitter', 'twitter-tools').'" />
+				</p>
+				<input type="hidden" name="ak_action" value="aktt_oauth_test" class="hidden" style="display: none;" />
+				'.wp_nonce_field('aktt_oauth_test', '_wpnonce', true, false).wp_referer_field(false).'
+			</form>
+				
+				');
+	}
+	else if ( aktt_oauth_test() ) {
+		print('	
+			<form id="ak_twittertools_disconnect" name="ak_twittertools_disconnect" action="'.admin_url('options-general.php').'" method="post">
+				<p><a href="#" id="aktt_authentication_showhide" class="auth_information_link">Account Information</a></p>
+				<div id="aktt_authentication_display">
 					<fieldset class="options">
-						<div class="option">
-							<label for="aktt_twitter_username">'.__('Twitter Username', 'twitter-tools').'/'.__('Password', 'twitter-tools').'</label>
-							<input type="text" size="25" name="aktt_twitter_username" id="aktt_twitter_username" value="'.esc_attr($aktt->twitter_username).'" autocomplete="off" />
-							<input type="password" size="25" name="aktt_twitter_password" id="aktt_twitter_password" value="'.esc_attr($aktt->twitter_password).'" autocomplete="off" />
-							<input type="button" class="button" name="aktt_login_test" id="aktt_login_test" value="'.__('Test Login Info', 'twitter-tools').'" onclick="akttTestLogin(); return false;" />
-							<span id="aktt_login_test_result"></span>
-						</div>
-						<div class="option">
-							<label for="aktt_notify_twitter">'.__('Enable option to create a tweet when you post in your blog?', 'twitter-tools').'</label>
-							<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.esc_attr($aktt->tweet_prefix).'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
-							<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for posting via XML-RPC', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
-							<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_blog_post_tags">'.__('Tag(s) for your tweet posts:', 'twitter-tools').'</label>
-							<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.esc_attr($aktt->blog_post_tags).'">
-							<span>'.__('Separate multiple tags with commas. Example: tweets, twitter', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_blog_post_author">'.__('Author for tweet posts:', 'twitter-tools').'</label>
-							<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar, digests and created blog posts?', 'twitter-tools').'</label>
-							<select name="aktt_exclude_reply_tweets" id="aktt_exclude_reply_tweets">'.$exclude_reply_tweets_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
-							<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.esc_attr($aktt->sidebar_tweet_count).'" />
-							<span>'.__('Numbers only please.', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_tweet_from_sidebar">'.__('Create tweets from your sidebar?', 'twitter-tools').'</label>
-							<select name="aktt_tweet_from_sidebar" id="aktt_tweet_from_sidebar">'.$tweet_from_sidebar_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_js_lib">'.__('JS Library to use?', 'twitter-tools').'</label>
-							<select name="aktt_js_lib" id="aktt_js_lib">'.$js_lib_options.'</select>
-						</div>
-						<div class="option">
-							<label for="aktt_give_tt_credit">'.__('Give Twitter Tools credit?', 'twitter-tools').'</label>
-							<select name="aktt_give_tt_credit" id="aktt_give_tt_credit">'.$give_tt_credit_options.'</select>
-						</div>
-						
-						<div class="aktt_experimental">
-							<h4>'.__('- Experimental -', 'twitter-tools').'</h4>
-						
-						<div class="option time_toggle">
-							<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
-							<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.esc_attr($aktt->digest_daily_time).'" />
-						</div>
-						<div class="option">
-							<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
-							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
-						</div>
-						<div class="option time_toggle">
-							<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
-							<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
-							<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.esc_attr($aktt->digest_weekly_time).'" />
-							<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
-						</div>
-						<div class="option">
-							<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
-							<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.esc_attr($aktt->digest_title_weekly).'" />
-							<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
-						</div>
-						<div class="option">
-							<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
-							<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
-						</div>
-						
-						</div>
-						
+						<div class="option"><span class="auth_label">'.__('Twitter Username ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->twitter_username.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Consumer Key ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_key.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Consumer Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->app_consumer_secret.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Access Token ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token.'</span></div>
+						<div class="option"><span class="auth_label">'.__('Access Token Secret ', 'twitter-tools').'</span><span class="auth_code">'.$aktt->oauth_token_secret.'</span></div>
 					</fieldset>
 					<p class="submit">
-						<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
+					<input type="submit" name="submit" class="button-primary" value="'.__('Disconnect Your WordPress and Twitter Account', 'twitter-tools').'" />
 					</p>
-					<input type="hidden" name="ak_action" value="aktt_update_settings" class="hidden" style="display: none;" />
-					'.wp_nonce_field('aktt_settings', '_wpnonce', true, false).wp_referer_field(false).'
-				</form>
+					<input type="hidden" name="ak_action" value="aktt_twitter_disconnect" class="hidden" style="display: none;" />
+					'.wp_nonce_field('aktt_twitter_disconnect', '_wpnonce', true, false).wp_referer_field(false).' 
+				</div>		
+			</form>
+					
+			<form id="ak_twittertools" name="ak_twittertools" action="'.admin_url('options-general.php').'" method="post">
+				<fieldset class="options">			
+					<div class="option">
+						<label for="aktt_notify_twitter">'.__('Enable option to create a tweet when you post in your blog?', 'twitter-tools').'</label>
+						<select name="aktt_notify_twitter" id="aktt_notify_twitter">'.$notify_twitter_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_tweet_prefix">'.__('Tweet prefix for new blog posts:', 'twitter-tools').'</label>
+						<input type="text" size="30" name="aktt_tweet_prefix" id="aktt_tweet_prefix" value="'.esc_attr($aktt->tweet_prefix).'" /><span>'.__('Cannot be left blank. Will result in <b>{Your prefix}: Title URL</b>', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_notify_twitter_default">'.__('Set this on by default?', 'twitter-tools').'</label>
+						<select name="aktt_notify_twitter_default" id="aktt_notify_twitter_default">'.$notify_twitter_default_options.'</select><span>'							.__('Also determines tweeting for posting via XML-RPC', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_create_blog_posts">'.__('Create a blog post from each of your tweets?', 'twitter-tools').'</label>
+						<select name="aktt_create_blog_posts" id="aktt_create_blog_posts">'.$create_blog_posts_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_blog_post_category">'.__('Category for tweet posts:', 'twitter-tools').'</label>
+						<select name="aktt_blog_post_category" id="aktt_blog_post_category">'.$cat_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_blog_post_tags">'.__('Tag(s) for your tweet posts:', 'twitter-tools').'</label>
+						<input name="aktt_blog_post_tags" id="aktt_blog_post_tags" value="'.esc_attr($aktt->blog_post_tags).'">
+						<span>'.__('Separate multiple tags with commas. Example: tweets, twitter', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_blog_post_author">'.__('Author for tweet posts:', 'twitter-tools').'</label>
+						<select name="aktt_blog_post_author" id="aktt_blog_post_author">'.$author_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_exclude_reply_tweets">'.__('Exclude @reply tweets in your sidebar, digests and created blog posts?', 'twitter-tools').'</label>
+						<select name="aktt_exclude_reply_tweets" id="aktt_exclude_reply_tweets">'.$exclude_reply_tweets_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_sidebar_tweet_count">'.__('Tweets to show in sidebar:', 'twitter-tools').'</label>
+						<input type="text" size="3" name="aktt_sidebar_tweet_count" id="aktt_sidebar_tweet_count" value="'.esc_attr($aktt->sidebar_tweet_count).'" />
+						<span>'.__('Numbers only please.', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_tweet_from_sidebar">'.__('Create tweets from your sidebar?', 'twitter-tools').'</label>
+						<select name="aktt_tweet_from_sidebar" id="aktt_tweet_from_sidebar">'.$tweet_from_sidebar_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_js_lib">'.__('JS Library to use?', 'twitter-tools').'</label>
+						<select name="aktt_js_lib" id="aktt_js_lib">'.$js_lib_options.'</select>
+					</div>
+					<div class="option">
+						<label for="aktt_give_tt_credit">'.__('Give Twitter Tools credit?', 'twitter-tools').'</label>
+						<select name="aktt_give_tt_credit" id="aktt_give_tt_credit">'.$give_tt_credit_options.'</select>
+					</div>
+				
+					<div class="aktt_experimental">
+						<h4>'.__('- Experimental -', 'twitter-tools').'</h4>
+				
+					<div class="option time_toggle">
+						<label>'.__('Create a daily digest blog post from your tweets?', 'twitter-tools').'</label>
+						<select name="aktt_create_digest" class="toggler">'.$create_digest_options.'</select>
+						<input type="hidden" class="time" id="aktt_digest_daily_time" name="aktt_digest_daily_time" value="'.esc_attr($aktt->digest_daily_time).'" />
+					</div>
+					<div class="option">
+						<label for="aktt_digest_title">'.__('Title for daily digest posts:', 'twitter-tools').'</label>
+						<input type="text" size="30" name="aktt_digest_title" id="aktt_digest_title" value="'.$aktt->digest_title.'" />
+						<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+					</div>
+					<div class="option time_toggle">
+						<label>'.__('Create a weekly digest blog post from your tweets?', 'twitter-tools').'</label>
+						<select name="aktt_create_digest_weekly" class="toggler">'.$create_digest_weekly_options.'</select>
+						<input type="hidden" class="time" name="aktt_digest_weekly_time" id="aktt_digest_weekly_time" value="'.esc_attr($aktt->digest_weekly_time).'" />
+						<input type="hidden" class="day" name="aktt_digest_weekly_day" value="'.$aktt->digest_weekly_day.'" />
+					</div>
+					<div class="option">
+						<label for="aktt_digest_title_weekly">'.__('Title for weekly digest posts:', 'twitter-tools').'</label>
+						<input type="text" size="30" name="aktt_digest_title_weekly" id="aktt_digest_title_weekly" value="'.esc_attr($aktt->digest_title_weekly).'" />
+						<span>'.__('Include %s where you want the date. Example: Tweets on %s', 'twitter-tools').'</span>
+					</div>
+					<div class="option">
+						<label for="aktt_digest_tweet_order">'.__('Order of tweets in digest?', 'twitter-tools').'</label>
+						<select name="aktt_digest_tweet_order" id="aktt_digest_tweet_order">'.$digest_tweet_order_options.'</select>
+					</div>
+				
+					</div>
+				
+				</fieldset>
+				<p class="submit">
+					<input type="submit" name="submit" class="button-primary" value="'.__('Update Twitter Tools Options', 'twitter-tools').'" />
+				</p>
+				<input type="hidden" name="ak_action" value="aktt_update_settings" class="hidden" style="display: none;" />
+				'.wp_nonce_field('aktt_settings', '_wpnonce', true, false).wp_referer_field(false).'
+			</form>
+			<h2>'.__('Update Tweets / Reset Checking and Digests', 'twitter-tools').'</h2>
+			<form name="ak_twittertools_updatetweets" action="'.admin_url('options-general.php').'" method="get">
+				<p>'.__('Use these buttons to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
+				<p class="submit">
+					<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
+					<input type="submit" name="reset-button-1" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
+					<input type="submit" name="reset-button-2" value="'.__('Reset Digests', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_digests\';" />
+					<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
+				</p>
+				'.wp_nonce_field('aktt_update_tweets', '_wpnonce', true, false).wp_referer_field(false).'
+			</form>
 	');
+	} //end elsif statement
+	do_action('aktt_options_form');
 ?>
-<div style="padding-left: 50px; width: 600px">
-<script type="text/javascript">
-var WPHC_AFF_ID = '14303';
-var WPHC_WP_VERSION = '<?php global $wp_version; echo $wp_version; ?>';
-</script>
-<script type="text/javascript"
-	src="http://cloud.wphelpcenter.com/wp-admin/0001/deliver.js">
-</script>
-</div>
+	<div id="cf">
+		<div id="cf-callouts">
+			<div class="cf-callout">
+				<div id="cf-callout-credit" class="cf-box">
+					<h3 class="cf-box-title">Plugin Developed By</h3>
+					<div class="cf-box-content">
+						<p class="txt-center"><a href="http://crowdfavorite.com/" title="Crowd Favorite : Elegant WordPress and Web Application Development"><img src="http://cloud.wphelpcenter.com/resources/wp-admin-0001/cf-logo.png" alt="Crowd Favorite"></a></p>
+						<p>An independent development firm specializing in WordPress development and integrations, sophisticated web applications, Open Source implementations and user experience consulting. If you need it to work, trust Crowd Favorite to build it.</p>
+					</div><!-- .cf-box-content -->
+				</div><!-- #cf-callout-credit -->						
+			</div>
+			<div class="cf-callout">
+				<div id="cf-callout-support" class="cf-box">
+					<h3 class="cf-box-title">Professional Support From</h3>
+					<div class="cf-box-content">
+						<p class="txt-center"><a href="http://wphelpcenter.com/" title="WordPress HelpCenter"><img src="http://cloud.wphelpcenter.com/resources/wp-admin-0001/wphc-logo.png" alt="WordPress HelpCenter"></a></p>
+						<p>Need help with WordPress right now? That's what we're here for. We can help with anything from how-to questions to server troubleshooting, theme customization to upgrades and installs. Give us a call - 303-395-1346.</p>
+					</div><!-- .cf-box-content -->
+				</div><!-- #cf-callout-support -->						
+			</div>
+		</div><!-- #cf-callouts -->
+	</div><!-- #cf -->
 <?php
 	print('
-				<h2>'.__('Update Tweets / Reset Checking and Digests', 'twitter-tools').'</h2>
-				<form name="ak_twittertools_updatetweets" action="'.admin_url('options-general.php').'" method="get">
-					<p>'.__('Use these buttons to manually update your tweets or reset the checking settings.', 'twitter-tools').'</p>
-					<p class="submit">
-						<input type="submit" name="submit-button" value="'.__('Update Tweets', 'twitter-tools').'" />
-						<input type="submit" name="reset-button-1" value="'.__('Reset Tweet Checking', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_tweet_checking\';" />
-						<input type="submit" name="reset-button-2" value="'.__('Reset Digests', 'twitter-tools').'" onclick="document.getElementById(\'ak_action_2\').value = \'aktt_reset_digests\';" />
-						<input type="hidden" name="ak_action" id="ak_action_2" value="aktt_update_tweets" />
-					</p>
-					'.wp_nonce_field('aktt_update_tweets', '_wpnonce', true, false).wp_referer_field(false).'
-				</form>
-	');
-	do_action('aktt_options_form');
-	print('
 				
-				<h2>'.__('README', 'twitter-tools').'</h2>
-				<p>'.__('Find answers to common questions here.', 'twitter-tools').'</p>
-				<iframe id="ak_readme" src="http://alexking.org/projects/wordpress/readme?project=twitter-tools"></iframe>
 			</div>
 	');
 }
@@ -1844,14 +2051,9 @@ function aktt_store_post_options($post_id, $post = false) {
 		$aktt->notify_twitter_default ? $meta = 'yes' : $meta = 'no';
 		$save = true;
 	}
-	else {
-		$save = false;
-	}
 	
 	if ($save) {
-		if (!update_post_meta($post_id, 'aktt_notify_twitter', $meta)) {
-			add_post_meta($post_id, 'aktt_notify_twitter', $meta);
-		}
+		update_post_meta($post_id, 'aktt_notify_twitter', $meta);
 	}
 }
 add_action('draft_post', 'aktt_store_post_options', 1, 2);
@@ -2002,840 +2204,6 @@ function aktt_relativeTime ($date, $precision=2)
 
 	// Return relative date and add proper verbiage
 	return sprintf(__('%s ago', 'twitter-tools'), $relative_date);
-}
-
-// For PHP < 5.2.0
-if ( !function_exists('json_encode') ) {
-
-	if (!class_exists('Services_JSON')) { // still make this conditional
-
-// PEAR JSON class
-
-/**
-* Converts to and from JSON format.
-*
-* JSON (JavaScript Object Notation) is a lightweight data-interchange
-* format. It is easy for humans to read and write. It is easy for machines
-* to parse and generate. It is based on a subset of the JavaScript
-* Programming Language, Standard ECMA-262 3rd Edition - December 1999.
-* This feature can also be found in  Python. JSON is a text format that is
-* completely language independent but uses conventions that are familiar
-* to programmers of the C-family of languages, including C, C++, C#, Java,
-* JavaScript, Perl, TCL, and many others. These properties make JSON an
-* ideal data-interchange language.
-*
-* This package provides a simple encoder and decoder for JSON notation. It
-* is intended for use with client-side Javascript applications that make
-* use of HTTPRequest to perform server communication functions - data can
-* be encoded into JSON notation for use in a client-side javascript, or
-* decoded from incoming Javascript requests. JSON format is native to
-* Javascript, and can be directly eval()'ed with no further parsing
-* overhead
-*
-* All strings should be in ASCII or UTF-8 format!
-*
-* LICENSE: Redistribution and use in source and binary forms, with or
-* without modification, are permitted provided that the following
-* conditions are met: Redistributions of source code must retain the
-* above copyright notice, this list of conditions and the following
-* disclaimer. Redistributions in binary form must reproduce the above
-* copyright notice, this list of conditions and the following disclaimer
-* in the documentation and/or other materials provided with the
-* distribution.
-*
-* THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
-* WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-* MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
-* NO EVENT SHALL CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-* OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
-* TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-* USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
-* DAMAGE.
-*
-* @category
-* @package     Services_JSON
-* @author      Michal Migurski <mike-json@teczno.com>
-* @author      Matt Knapp <mdknapp[at]gmail[dot]com>
-* @author      Brett Stimmerman <brettstimmerman[at]gmail[dot]com>
-* @copyright   2005 Michal Migurski
-* @version     CVS: $Id: JSON.php,v 1.31 2006/06/28 05:54:17 migurski Exp $
-* @license     http://www.opensource.org/licenses/bsd-license.php
-* @link        http://pear.php.net/pepr/pepr-proposal-show.php?id=198
-*/
-
-/**
-* Marker constant for Services_JSON::decode(), used to flag stack state
-*/
-define('SERVICES_JSON_SLICE',   1);
-
-/**
-* Marker constant for Services_JSON::decode(), used to flag stack state
-*/
-define('SERVICES_JSON_IN_STR',  2);
-
-/**
-* Marker constant for Services_JSON::decode(), used to flag stack state
-*/
-define('SERVICES_JSON_IN_ARR',  3);
-
-/**
-* Marker constant for Services_JSON::decode(), used to flag stack state
-*/
-define('SERVICES_JSON_IN_OBJ',  4);
-
-/**
-* Marker constant for Services_JSON::decode(), used to flag stack state
-*/
-define('SERVICES_JSON_IN_CMT', 5);
-
-/**
-* Behavior switch for Services_JSON::decode()
-*/
-define('SERVICES_JSON_LOOSE_TYPE', 16);
-
-/**
-* Behavior switch for Services_JSON::decode()
-*/
-define('SERVICES_JSON_SUPPRESS_ERRORS', 32);
-
-/**
-* Converts to and from JSON format.
-*
-* Brief example of use:
-*
-* <code>
-* // create a new instance of Services_JSON
-* $json = new Services_JSON();
-*
-* // convert a complexe value to JSON notation, and send it to the browser
-* $value = array('foo', 'bar', array(1, 2, 'baz'), array(3, array(4)));
-* $output = $json->encode($value);
-*
-* print($output);
-* // prints: ["foo","bar",[1,2,"baz"],[3,[4]]]
-*
-* // accept incoming POST data, assumed to be in JSON notation
-* $input = file_get_contents('php://input', 1000000);
-* $value = $json->decode($input);
-* </code>
-*/
-class Services_JSON
-{
-   /**
-    * constructs a new JSON instance
-    *
-    * @param    int     $use    object behavior flags; combine with boolean-OR
-    *
-    *                           possible values:
-    *                           - SERVICES_JSON_LOOSE_TYPE:  loose typing.
-    *                                   "{...}" syntax creates associative arrays
-    *                                   instead of objects in decode().
-    *                           - SERVICES_JSON_SUPPRESS_ERRORS:  error suppression.
-    *                                   Values which can't be encoded (e.g. resources)
-    *                                   appear as NULL instead of throwing errors.
-    *                                   By default, a deeply-nested resource will
-    *                                   bubble up with an error, so all return values
-    *                                   from encode() should be checked with isError()
-    */
-    function Services_JSON($use = 0)
-    {
-        $this->use = $use;
-    }
-
-   /**
-    * convert a string from one UTF-16 char to one UTF-8 char
-    *
-    * Normally should be handled by mb_convert_encoding, but
-    * provides a slower PHP-only method for installations
-    * that lack the multibye string extension.
-    *
-    * @param    string  $utf16  UTF-16 character
-    * @return   string  UTF-8 character
-    * @access   private
-    */
-    function utf162utf8($utf16)
-    {
-        // oh please oh please oh please oh please oh please
-        if(function_exists('mb_convert_encoding')) {
-            return mb_convert_encoding($utf16, 'UTF-8', 'UTF-16');
-        }
-
-        $bytes = (ord($utf16{0}) << 8) | ord($utf16{1});
-
-        switch(true) {
-            case ((0x7F & $bytes) == $bytes):
-                // this case should never be reached, because we are in ASCII range
-                // see: http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                return chr(0x7F & $bytes);
-
-            case (0x07FF & $bytes) == $bytes:
-                // return a 2-byte UTF-8 character
-                // see: http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                return chr(0xC0 | (($bytes >> 6) & 0x1F))
-                     . chr(0x80 | ($bytes & 0x3F));
-
-            case (0xFFFF & $bytes) == $bytes:
-                // return a 3-byte UTF-8 character
-                // see: http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                return chr(0xE0 | (($bytes >> 12) & 0x0F))
-                     . chr(0x80 | (($bytes >> 6) & 0x3F))
-                     . chr(0x80 | ($bytes & 0x3F));
-        }
-
-        // ignoring UTF-32 for now, sorry
-        return '';
-    }
-
-   /**
-    * convert a string from one UTF-8 char to one UTF-16 char
-    *
-    * Normally should be handled by mb_convert_encoding, but
-    * provides a slower PHP-only method for installations
-    * that lack the multibye string extension.
-    *
-    * @param    string  $utf8   UTF-8 character
-    * @return   string  UTF-16 character
-    * @access   private
-    */
-    function utf82utf16($utf8)
-    {
-        // oh please oh please oh please oh please oh please
-        if(function_exists('mb_convert_encoding')) {
-            return mb_convert_encoding($utf8, 'UTF-16', 'UTF-8');
-        }
-
-        switch(strlen($utf8)) {
-            case 1:
-                // this case should never be reached, because we are in ASCII range
-                // see: http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                return $utf8;
-
-            case 2:
-                // return a UTF-16 character from a 2-byte UTF-8 char
-                // see: http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                return chr(0x07 & (ord($utf8{0}) >> 2))
-                     . chr((0xC0 & (ord($utf8{0}) << 6))
-                         | (0x3F & ord($utf8{1})));
-
-            case 3:
-                // return a UTF-16 character from a 3-byte UTF-8 char
-                // see: http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                return chr((0xF0 & (ord($utf8{0}) << 4))
-                         | (0x0F & (ord($utf8{1}) >> 2)))
-                     . chr((0xC0 & (ord($utf8{1}) << 6))
-                         | (0x7F & ord($utf8{2})));
-        }
-
-        // ignoring UTF-32 for now, sorry
-        return '';
-    }
-
-   /**
-    * encodes an arbitrary variable into JSON format
-    *
-    * @param    mixed   $var    any number, boolean, string, array, or object to be encoded.
-    *                           see argument 1 to Services_JSON() above for array-parsing behavior.
-    *                           if var is a strng, note that encode() always expects it
-    *                           to be in ASCII or UTF-8 format!
-    *
-    * @return   mixed   JSON string representation of input var or an error if a problem occurs
-    * @access   public
-    */
-    function encode($var)
-    {
-        switch (gettype($var)) {
-            case 'boolean':
-                return $var ? 'true' : 'false';
-
-            case 'NULL':
-                return 'null';
-
-            case 'integer':
-                return (int) $var;
-
-            case 'double':
-            case 'float':
-                return (float) $var;
-
-            case 'string':
-                // STRINGS ARE EXPECTED TO BE IN ASCII OR UTF-8 FORMAT
-                $ascii = '';
-                $strlen_var = strlen($var);
-
-               /*
-                * Iterate over every character in the string,
-                * escaping with a slash or encoding to UTF-8 where necessary
-                */
-                for ($c = 0; $c < $strlen_var; ++$c) {
-
-                    $ord_var_c = ord($var{$c});
-
-                    switch (true) {
-                        case $ord_var_c == 0x08:
-                            $ascii .= '\b';
-                            break;
-                        case $ord_var_c == 0x09:
-                            $ascii .= '\t';
-                            break;
-                        case $ord_var_c == 0x0A:
-                            $ascii .= '\n';
-                            break;
-                        case $ord_var_c == 0x0C:
-                            $ascii .= '\f';
-                            break;
-                        case $ord_var_c == 0x0D:
-                            $ascii .= '\r';
-                            break;
-
-                        case $ord_var_c == 0x22:
-                        case $ord_var_c == 0x2F:
-                        case $ord_var_c == 0x5C:
-                            // double quote, slash, slosh
-                            $ascii .= '\\'.$var{$c};
-                            break;
-
-                        case (($ord_var_c >= 0x20) && ($ord_var_c <= 0x7F)):
-                            // characters U-00000000 - U-0000007F (same as ASCII)
-                            $ascii .= $var{$c};
-                            break;
-
-                        case (($ord_var_c & 0xE0) == 0xC0):
-                            // characters U-00000080 - U-000007FF, mask 110XXXXX
-                            // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                            $char = pack('C*', $ord_var_c, ord($var{$c + 1}));
-                            $c += 1;
-                            $utf16 = $this->utf82utf16($char);
-                            $ascii .= sprintf('\u%04s', bin2hex($utf16));
-                            break;
-
-                        case (($ord_var_c & 0xF0) == 0xE0):
-                            // characters U-00000800 - U-0000FFFF, mask 1110XXXX
-                            // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                            $char = pack('C*', $ord_var_c,
-                                         ord($var{$c + 1}),
-                                         ord($var{$c + 2}));
-                            $c += 2;
-                            $utf16 = $this->utf82utf16($char);
-                            $ascii .= sprintf('\u%04s', bin2hex($utf16));
-                            break;
-
-                        case (($ord_var_c & 0xF8) == 0xF0):
-                            // characters U-00010000 - U-001FFFFF, mask 11110XXX
-                            // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                            $char = pack('C*', $ord_var_c,
-                                         ord($var{$c + 1}),
-                                         ord($var{$c + 2}),
-                                         ord($var{$c + 3}));
-                            $c += 3;
-                            $utf16 = $this->utf82utf16($char);
-                            $ascii .= sprintf('\u%04s', bin2hex($utf16));
-                            break;
-
-                        case (($ord_var_c & 0xFC) == 0xF8):
-                            // characters U-00200000 - U-03FFFFFF, mask 111110XX
-                            // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                            $char = pack('C*', $ord_var_c,
-                                         ord($var{$c + 1}),
-                                         ord($var{$c + 2}),
-                                         ord($var{$c + 3}),
-                                         ord($var{$c + 4}));
-                            $c += 4;
-                            $utf16 = $this->utf82utf16($char);
-                            $ascii .= sprintf('\u%04s', bin2hex($utf16));
-                            break;
-
-                        case (($ord_var_c & 0xFE) == 0xFC):
-                            // characters U-04000000 - U-7FFFFFFF, mask 1111110X
-                            // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                            $char = pack('C*', $ord_var_c,
-                                         ord($var{$c + 1}),
-                                         ord($var{$c + 2}),
-                                         ord($var{$c + 3}),
-                                         ord($var{$c + 4}),
-                                         ord($var{$c + 5}));
-                            $c += 5;
-                            $utf16 = $this->utf82utf16($char);
-                            $ascii .= sprintf('\u%04s', bin2hex($utf16));
-                            break;
-                    }
-                }
-
-                return '"'.$ascii.'"';
-
-            case 'array':
-               /*
-                * As per JSON spec if any array key is not an integer
-                * we must treat the the whole array as an object. We
-                * also try to catch a sparsely populated associative
-                * array with numeric keys here because some JS engines
-                * will create an array with empty indexes up to
-                * max_index which can cause memory issues and because
-                * the keys, which may be relevant, will be remapped
-                * otherwise.
-                *
-                * As per the ECMA and JSON specification an object may
-                * have any string as a property. Unfortunately due to
-                * a hole in the ECMA specification if the key is a
-                * ECMA reserved word or starts with a digit the
-                * parameter is only accessible using ECMAScript's
-                * bracket notation.
-                */
-
-                // treat as a JSON object
-                if (is_array($var) && count($var) && (array_keys($var) !== range(0, sizeof($var) - 1))) {
-                    $properties = array_map(array($this, 'name_value'),
-                                            array_keys($var),
-                                            array_values($var));
-
-                    foreach($properties as $property) {
-                        if(Services_JSON::isError($property)) {
-                            return $property;
-                        }
-                    }
-
-                    return '{' . join(',', $properties) . '}';
-                }
-
-                // treat it like a regular array
-                $elements = array_map(array($this, 'encode'), $var);
-
-                foreach($elements as $element) {
-                    if(Services_JSON::isError($element)) {
-                        return $element;
-                    }
-                }
-
-                return '[' . join(',', $elements) . ']';
-
-            case 'object':
-                $vars = get_object_vars($var);
-
-                $properties = array_map(array($this, 'name_value'),
-                                        array_keys($vars),
-                                        array_values($vars));
-
-                foreach($properties as $property) {
-                    if(Services_JSON::isError($property)) {
-                        return $property;
-                    }
-                }
-
-                return '{' . join(',', $properties) . '}';
-
-            default:
-                return ($this->use & SERVICES_JSON_SUPPRESS_ERRORS)
-                    ? 'null'
-                    : new Services_JSON_Error(gettype($var)." can not be encoded as JSON string");
-        }
-    }
-
-   /**
-    * array-walking function for use in generating JSON-formatted name-value pairs
-    *
-    * @param    string  $name   name of key to use
-    * @param    mixed   $value  reference to an array element to be encoded
-    *
-    * @return   string  JSON-formatted name-value pair, like '"name":value'
-    * @access   private
-    */
-    function name_value($name, $value)
-    {
-        $encoded_value = $this->encode($value);
-
-        if(Services_JSON::isError($encoded_value)) {
-            return $encoded_value;
-        }
-
-        return $this->encode(strval($name)) . ':' . $encoded_value;
-    }
-
-   /**
-    * reduce a string by removing leading and trailing comments and whitespace
-    *
-    * @param    $str    string      string value to strip of comments and whitespace
-    *
-    * @return   string  string value stripped of comments and whitespace
-    * @access   private
-    */
-    function reduce_string($str)
-    {
-        $str = preg_replace(array(
-
-                // eliminate single line comments in '// ...' form
-                '#^\s*//(.+)$#m',
-
-                // eliminate multi-line comments in '/* ... */' form, at start of string
-                '#^\s*/\*(.+)\*/#Us',
-
-                // eliminate multi-line comments in '/* ... */' form, at end of string
-                '#/\*(.+)\*/\s*$#Us'
-
-            ), '', $str);
-
-        // eliminate extraneous space
-        return trim($str);
-    }
-
-   /**
-    * decodes a JSON string into appropriate variable
-    *
-    * @param    string  $str    JSON-formatted string
-    *
-    * @return   mixed   number, boolean, string, array, or object
-    *                   corresponding to given JSON input string.
-    *                   See argument 1 to Services_JSON() above for object-output behavior.
-    *                   Note that decode() always returns strings
-    *                   in ASCII or UTF-8 format!
-    * @access   public
-    */
-    function decode($str)
-    {
-        $str = $this->reduce_string($str);
-
-        switch (strtolower($str)) {
-            case 'true':
-                return true;
-
-            case 'false':
-                return false;
-
-            case 'null':
-                return null;
-
-            default:
-                $m = array();
-
-                if (is_numeric($str)) {
-                    // Lookie-loo, it's a number
-
-                    // This would work on its own, but I'm trying to be
-                    // good about returning integers where appropriate:
-                    // return (float)$str;
-
-                    // Return float or int, as appropriate
-                    return ((float)$str == (integer)$str)
-                        ? (integer)$str
-                        : (float)$str;
-
-                } elseif (preg_match('/^("|\').*(\1)$/s', $str, $m) && $m[1] == $m[2]) {
-                    // STRINGS RETURNED IN UTF-8 FORMAT
-                    $delim = substr($str, 0, 1);
-                    $chrs = substr($str, 1, -1);
-                    $utf8 = '';
-                    $strlen_chrs = strlen($chrs);
-
-                    for ($c = 0; $c < $strlen_chrs; ++$c) {
-
-                        $substr_chrs_c_2 = substr($chrs, $c, 2);
-                        $ord_chrs_c = ord($chrs{$c});
-
-                        switch (true) {
-                            case $substr_chrs_c_2 == '\b':
-                                $utf8 .= chr(0x08);
-                                ++$c;
-                                break;
-                            case $substr_chrs_c_2 == '\t':
-                                $utf8 .= chr(0x09);
-                                ++$c;
-                                break;
-                            case $substr_chrs_c_2 == '\n':
-                                $utf8 .= chr(0x0A);
-                                ++$c;
-                                break;
-                            case $substr_chrs_c_2 == '\f':
-                                $utf8 .= chr(0x0C);
-                                ++$c;
-                                break;
-                            case $substr_chrs_c_2 == '\r':
-                                $utf8 .= chr(0x0D);
-                                ++$c;
-                                break;
-
-                            case $substr_chrs_c_2 == '\\"':
-                            case $substr_chrs_c_2 == '\\\'':
-                            case $substr_chrs_c_2 == '\\\\':
-                            case $substr_chrs_c_2 == '\\/':
-                                if (($delim == '"' && $substr_chrs_c_2 != '\\\'') ||
-                                   ($delim == "'" && $substr_chrs_c_2 != '\\"')) {
-                                    $utf8 .= $chrs{++$c};
-                                }
-                                break;
-
-                            case preg_match('/\\\u[0-9A-F]{4}/i', substr($chrs, $c, 6)):
-                                // single, escaped unicode character
-                                $utf16 = chr(hexdec(substr($chrs, ($c + 2), 2)))
-                                       . chr(hexdec(substr($chrs, ($c + 4), 2)));
-                                $utf8 .= $this->utf162utf8($utf16);
-                                $c += 5;
-                                break;
-
-                            case ($ord_chrs_c >= 0x20) && ($ord_chrs_c <= 0x7F):
-                                $utf8 .= $chrs{$c};
-                                break;
-
-                            case ($ord_chrs_c & 0xE0) == 0xC0:
-                                // characters U-00000080 - U-000007FF, mask 110XXXXX
-                                //see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                                $utf8 .= substr($chrs, $c, 2);
-                                ++$c;
-                                break;
-
-                            case ($ord_chrs_c & 0xF0) == 0xE0:
-                                // characters U-00000800 - U-0000FFFF, mask 1110XXXX
-                                // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                                $utf8 .= substr($chrs, $c, 3);
-                                $c += 2;
-                                break;
-
-                            case ($ord_chrs_c & 0xF8) == 0xF0:
-                                // characters U-00010000 - U-001FFFFF, mask 11110XXX
-                                // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                                $utf8 .= substr($chrs, $c, 4);
-                                $c += 3;
-                                break;
-
-                            case ($ord_chrs_c & 0xFC) == 0xF8:
-                                // characters U-00200000 - U-03FFFFFF, mask 111110XX
-                                // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                                $utf8 .= substr($chrs, $c, 5);
-                                $c += 4;
-                                break;
-
-                            case ($ord_chrs_c & 0xFE) == 0xFC:
-                                // characters U-04000000 - U-7FFFFFFF, mask 1111110X
-                                // see http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
-                                $utf8 .= substr($chrs, $c, 6);
-                                $c += 5;
-                                break;
-
-                        }
-
-                    }
-
-                    return $utf8;
-
-                } elseif (preg_match('/^\[.*\]$/s', $str) || preg_match('/^\{.*\}$/s', $str)) {
-                    // array, or object notation
-
-                    if ($str{0} == '[') {
-                        $stk = array(SERVICES_JSON_IN_ARR);
-                        $arr = array();
-                    } else {
-                        if ($this->use & SERVICES_JSON_LOOSE_TYPE) {
-                            $stk = array(SERVICES_JSON_IN_OBJ);
-                            $obj = array();
-                        } else {
-                            $stk = array(SERVICES_JSON_IN_OBJ);
-                            $obj = new stdClass();
-                        }
-                    }
-
-                    array_push($stk, array('what'  => SERVICES_JSON_SLICE,
-                                           'where' => 0,
-                                           'delim' => false));
-
-                    $chrs = substr($str, 1, -1);
-                    $chrs = $this->reduce_string($chrs);
-
-                    if ($chrs == '') {
-                        if (reset($stk) == SERVICES_JSON_IN_ARR) {
-                            return $arr;
-
-                        } else {
-                            return $obj;
-
-                        }
-                    }
-
-                    //print("\nparsing {$chrs}\n");
-
-                    $strlen_chrs = strlen($chrs);
-
-                    for ($c = 0; $c <= $strlen_chrs; ++$c) {
-
-                        $top = end($stk);
-                        $substr_chrs_c_2 = substr($chrs, $c, 2);
-
-                        if (($c == $strlen_chrs) || (($chrs{$c} == ',') && ($top['what'] == SERVICES_JSON_SLICE))) {
-                            // found a comma that is not inside a string, array, etc.,
-                            // OR we've reached the end of the character list
-                            $slice = substr($chrs, $top['where'], ($c - $top['where']));
-                            array_push($stk, array('what' => SERVICES_JSON_SLICE, 'where' => ($c + 1), 'delim' => false));
-                            //print("Found split at {$c}: ".substr($chrs, $top['where'], (1 + $c - $top['where']))."\n");
-
-                            if (reset($stk) == SERVICES_JSON_IN_ARR) {
-                                // we are in an array, so just push an element onto the stack
-                                array_push($arr, $this->decode($slice));
-
-                            } elseif (reset($stk) == SERVICES_JSON_IN_OBJ) {
-                                // we are in an object, so figure
-                                // out the property name and set an
-                                // element in an associative array,
-                                // for now
-                                $parts = array();
-                                
-                                if (preg_match('/^\s*(["\'].*[^\\\]["\'])\s*:\s*(\S.*),?$/Uis', $slice, $parts)) {
-                                    // "name":value pair
-                                    $key = $this->decode($parts[1]);
-                                    $val = $this->decode($parts[2]);
-
-                                    if ($this->use & SERVICES_JSON_LOOSE_TYPE) {
-                                        $obj[$key] = $val;
-                                    } else {
-                                        $obj->$key = $val;
-                                    }
-                                } elseif (preg_match('/^\s*(\w+)\s*:\s*(\S.*),?$/Uis', $slice, $parts)) {
-                                    // name:value pair, where name is unquoted
-                                    $key = $parts[1];
-                                    $val = $this->decode($parts[2]);
-
-                                    if ($this->use & SERVICES_JSON_LOOSE_TYPE) {
-                                        $obj[$key] = $val;
-                                    } else {
-                                        $obj->$key = $val;
-                                    }
-                                }
-
-                            }
-
-                        } elseif ((($chrs{$c} == '"') || ($chrs{$c} == "'")) && ($top['what'] != SERVICES_JSON_IN_STR)) {
-                            // found a quote, and we are not inside a string
-                            array_push($stk, array('what' => SERVICES_JSON_IN_STR, 'where' => $c, 'delim' => $chrs{$c}));
-                            //print("Found start of string at {$c}\n");
-
-                        } elseif (($chrs{$c} == $top['delim']) &&
-                                 ($top['what'] == SERVICES_JSON_IN_STR) &&
-                                 ((strlen(substr($chrs, 0, $c)) - strlen(rtrim(substr($chrs, 0, $c), '\\'))) % 2 != 1)) {
-                            // found a quote, we're in a string, and it's not escaped
-                            // we know that it's not escaped becase there is _not_ an
-                            // odd number of backslashes at the end of the string so far
-                            array_pop($stk);
-                            //print("Found end of string at {$c}: ".substr($chrs, $top['where'], (1 + 1 + $c - $top['where']))."\n");
-
-                        } elseif (($chrs{$c} == '[') &&
-                                 in_array($top['what'], array(SERVICES_JSON_SLICE, SERVICES_JSON_IN_ARR, SERVICES_JSON_IN_OBJ))) {
-                            // found a left-bracket, and we are in an array, object, or slice
-                            array_push($stk, array('what' => SERVICES_JSON_IN_ARR, 'where' => $c, 'delim' => false));
-                            //print("Found start of array at {$c}\n");
-
-                        } elseif (($chrs{$c} == ']') && ($top['what'] == SERVICES_JSON_IN_ARR)) {
-                            // found a right-bracket, and we're in an array
-                            array_pop($stk);
-                            //print("Found end of array at {$c}: ".substr($chrs, $top['where'], (1 + $c - $top['where']))."\n");
-
-                        } elseif (($chrs{$c} == '{') &&
-                                 in_array($top['what'], array(SERVICES_JSON_SLICE, SERVICES_JSON_IN_ARR, SERVICES_JSON_IN_OBJ))) {
-                            // found a left-brace, and we are in an array, object, or slice
-                            array_push($stk, array('what' => SERVICES_JSON_IN_OBJ, 'where' => $c, 'delim' => false));
-                            //print("Found start of object at {$c}\n");
-
-                        } elseif (($chrs{$c} == '}') && ($top['what'] == SERVICES_JSON_IN_OBJ)) {
-                            // found a right-brace, and we're in an object
-                            array_pop($stk);
-                            //print("Found end of object at {$c}: ".substr($chrs, $top['where'], (1 + $c - $top['where']))."\n");
-
-                        } elseif (($substr_chrs_c_2 == '/*') &&
-                                 in_array($top['what'], array(SERVICES_JSON_SLICE, SERVICES_JSON_IN_ARR, SERVICES_JSON_IN_OBJ))) {
-                            // found a comment start, and we are in an array, object, or slice
-                            array_push($stk, array('what' => SERVICES_JSON_IN_CMT, 'where' => $c, 'delim' => false));
-                            $c++;
-                            //print("Found start of comment at {$c}\n");
-
-                        } elseif (($substr_chrs_c_2 == '*/') && ($top['what'] == SERVICES_JSON_IN_CMT)) {
-                            // found a comment end, and we're in one now
-                            array_pop($stk);
-                            $c++;
-
-                            for ($i = $top['where']; $i <= $c; ++$i)
-                                $chrs = substr_replace($chrs, ' ', $i, 1);
-
-                            //print("Found end of comment at {$c}: ".substr($chrs, $top['where'], (1 + $c - $top['where']))."\n");
-
-                        }
-
-                    }
-
-                    if (reset($stk) == SERVICES_JSON_IN_ARR) {
-                        return $arr;
-
-                    } elseif (reset($stk) == SERVICES_JSON_IN_OBJ) {
-                        return $obj;
-
-                    }
-
-                }
-        }
-    }
-
-    /**
-     * @todo Ultimately, this should just call PEAR::isError()
-     */
-    function isError($data, $code = null)
-    {
-        if (class_exists('pear')) {
-            return PEAR::isError($data, $code);
-        } elseif (is_object($data) && (get_class($data) == 'services_json_error' ||
-                                 is_subclass_of($data, 'services_json_error'))) {
-            return true;
-        }
-
-        return false;
-    }
-}
-
-if (class_exists('PEAR_Error')) {
-
-    class Services_JSON_Error extends PEAR_Error
-    {
-        function Services_JSON_Error($message = 'unknown error', $code = null,
-                                     $mode = null, $options = null, $userinfo = null)
-        {
-            parent::PEAR_Error($message, $code, $mode, $options, $userinfo);
-        }
-    }
-
-} else {
-
-    /**
-     * @todo Ultimately, this class shall be descended from PEAR_Error
-     */
-    class Services_JSON_Error
-    {
-        function Services_JSON_Error($message = 'unknown error', $code = null,
-                                     $mode = null, $options = null, $userinfo = null)
-        {
-
-        }
-    }
-
-}
-
-	} // end if (!class_exists('Services_JSON')) { 
-
-// adapted from WP 2.9
-
-	function json_encode( $string ) {
-		global $wp_json;
-
-		if ( !is_a($wp_json, 'Services_JSON') ) {
-			$wp_json = new Services_JSON();
-		}
-
-		return $wp_json->encode( $string );
-	}
-
-	function json_decode( $string ) {
-		global $wp_json;
-
-		if ( !is_a($wp_json, 'Services_JSON') ) {
-			$wp_json = new Services_JSON();
-		}
-
-		return $wp_json->decode( $string );
-	}
 }
 
 ?>

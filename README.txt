@@ -1,9 +1,9 @@
 === Twitter Tools ===
 Tags: twitter, tweet, integration, post, digest, notify, integrate, archive, widget
 Contributors: alexkingorg, crowdfavorite
-Requires at least: 2.8
-Tested up to: 3.0b1
-Stable tag: 2.3.1
+Requires at least: 2.9
+Tested up to: 3.0.1
+Stable tag: 2.4
 
 Twitter Tools is a plugin that creates a complete integration between your WordPress blog and your Twitter account.
 
@@ -25,7 +25,7 @@ Twitter Tools integrates with Twitter by giving you the following functionality:
 1. Download the plugin archive and expand it (you've likely already done this).
 2. Put the 'twitter-tools' directory into your wp-content/plugins/ directory.
 3. Go to the Plugins page in your WordPress Administration area and click 'Activate' for Twitter Tools.
-4. Go to the Twitter Tools Options page (Settings > Twitter Tools) to set your Twitter account information and preferences.
+4. Go to the Twitter Tools Options page (Settings > Twitter Tools) to set up your Twitter information and preferences.
 
 
 == Configuration ==
@@ -221,9 +221,19 @@ No, this is not a good idea. Twitter Tools needs to be able to look at the begin
 
 == Changelog ==
 
+= 2.4 =
+
+* Replaced 401 authentication with OAuth.
+* Now relies on WordPress to provide JSON encode/decode functions.
+* WP 3.0 compatibility fix for hashtags plugin (set default hashtags properly).
+* WP 3.0 compatibility fix for creating duplicate post meta.
+* Added support form to settings page.
+
+
 = 2.3.1 =
 
 * Fixed a typo that was breaking the latest tweet template tag.
+
 
 = 2.3 =
 
