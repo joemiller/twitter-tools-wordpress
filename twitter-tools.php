@@ -1029,8 +1029,8 @@ function aktt_head() {
 	global $aktt;
 	if ($aktt->tweet_from_sidebar) {
 		print('
-			<link rel="stylesheet" type="text/css" href="'.site_url('/index.php?ak_action=aktt_css&v='.AKTT_VERSION).'" />
-			<script type="text/javascript" src="'.site_url('/index.php?ak_action=aktt_js&v='.AKTT_VERSION).'"></script>
+			<link rel="stylesheet" type="text/css" href="'.site_url('/index.php?ak_action=aktt_css&amp;v='.AKTT_VERSION).'" />
+			<script type="text/javascript" src="'.site_url('/index.php?ak_action=aktt_js&amp;v='.AKTT_VERSION).'"></script>
 		');
 	}
 }
@@ -1038,8 +1038,8 @@ add_action('wp_head', 'aktt_head');
 
 function aktt_head_admin() {
 	print('
-		<link rel="stylesheet" type="text/css" href="'.admin_url('index.php?ak_action=aktt_css_admin&v='.AKTT_VERSION).'" />
-		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin&v='.AKTT_VERSION).'"></script>
+		<link rel="stylesheet" type="text/css" href="'.admin_url('index.php?ak_action=aktt_css_admin&amp;v='.AKTT_VERSION).'" />
+		<script type="text/javascript" src="'.admin_url('index.php?ak_action=aktt_js_admin&amp;v='.AKTT_VERSION).'"></script>
 	');
 }
 if (isset($_GET['page']) && $_GET['page'] == 'twitter-tools.php') {
