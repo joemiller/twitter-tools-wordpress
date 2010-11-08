@@ -1023,7 +1023,7 @@ function aktt_init() {
 		}
 	}
 }
-add_action('init', 'aktt_init');
+add_action('init', 'aktt_init', 1);
 
 function aktt_head() {
 	global $aktt;
@@ -1047,6 +1047,7 @@ if (isset($_GET['page']) && $_GET['page'] == 'twitter-tools.php') {
 }
 
 function aktt_resources() {
+	global $aktt;
 	if (!empty($_GET['ak_action'])) {
 		switch($_GET['ak_action']) {
 			case 'aktt_js':
@@ -1508,12 +1509,12 @@ form.aktt p.submit,
 		}
 	}
 }
-add_action('init', 'aktt_resources', 1);
+add_action('init', 'aktt_resources', 2);
 
 function aktt_oauth_connection() {
 	global $aktt;
 	if ( !empty($aktt->app_consumer_key) && !empty($aktt->app_consumer_secret) && !empty($aktt->oauth_token) && !empty($aktt->oauth_token_secret) ) {	
-		require_once('twitteroauth.php');
+		require_once(dirname(__FILE__).'/twitteroauth.php');
 		$connection = new TwitterOAuth(
 			$aktt->app_consumer_key, 
 			$aktt->app_consumer_secret, 
