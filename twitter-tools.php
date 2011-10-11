@@ -52,7 +52,7 @@ else if (is_file(trailingslashit(ABSPATH.PLUGINDIR).'twitter-tools/twitter-tools
 }
 
 define('AKTT_API_POST_STATUS', 'http://twitter.com/statuses/update.json');
-define('AKTT_API_USER_TIMELINE', 'http://twitter.com/statuses/user_timeline.json');
+define('AKTT_API_USER_TIMELINE', 'http://api.twitter.com/1/statuses/user_timeline.json?include_rts=true');
 define('AKTT_API_STATUS_SHOW', 'http://twitter.com/statuses/show/###ID###.json');
 define('AKTT_PROFILE_URL', 'http://twitter.com/###USERNAME###');
 define('AKTT_STATUS_URL', 'http://twitter.com/###USERNAME###/statuses/###STATUS###');
@@ -694,9 +694,18 @@ function aktt_update_tweets() {
 		");
 		foreach ($tweets as $tw_data) {
 			if (!$existing_ids || !in_array($tw_data->id, $existing_ids)) {
+				$tweet_text = '';
+				if ($tw_data->retweeted_status) {
+					$tweet_text = "RT @" . $tw_data->retweeted_status->user->screen_name;
+					$tweet_text .= " " . $tw_data->retweeted_status->text;
+
+				} else {
+					$tweet_text = $tw_data->text;
+				}
+
 				$tweet = new aktt_tweet(
 					$tw_data->id
-					, $tw_data->text
+					, $tweet_text
 				);
 				$tweet->tw_created_at = $tweet->twdate_to_time($tw_data->created_at);
 				if (!empty($tw_data->in_reply_to_status_id)) {
